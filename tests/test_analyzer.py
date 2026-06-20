@@ -78,3 +78,72 @@ def test_analyze_handles_api_error():
         results = analyze(articles)
 
     assert results == []
+
+
+def test_analyze_handles_fewer_results_than_articles():
+    """Claude returning fewer results than articles should not crash or mis-attribute."""
+    articles = [_make_article(f"Article {i}") for i in range(3)]
+
+    mock_response = MagicMock()
+    mock_response.content = [
+        MagicMock(
+            text=json.dumps([
+                {
+                    "title": "Article 0",
+                    "relevance": 7,
+                    "summary": "summary",
+                    "why_it_matters": "matters",
+                    "impacts": [],
+                    "actions": [],
+                }
+            ])
+        )
+    ]
+
+    with patch("anthropic.Anthropic") as mock_cls:
+        mock_client = MagicMock()
+        mock_cls.return_value = mock_client
+        mock_client.messages.create.return_value = mock_response
+        results = analyze(articles)
+
+    assert len(results) == 1
+    assert results[0].source == "Test"
+
+
+def test_analyze_handles_more_results_than_articles():
+    """Claude returning more results than articles should not mis-attribute extras."""
+    articles = [_make_article("Only article", source="RealSource")]
+
+    mock_response = MagicMock()
+    mock_response.content = [
+        MagicMock(
+            text=json.dumps([
+                {
+                    "title": "Only article",
+                    "relevance": 7,
+                    "summary": "summary",
+                    "why_it_matters": "matters",
+                    "impacts": [],
+                    "actions": [],
+                },
+                {
+                    "title": "Extra article",
+                    "relevance": 5,
+                    "summary": "extra",
+                    "why_it_matters": "extra",
+                    "impacts": [],
+                    "actions": [],
+                },
+            ])
+        )
+    ]
+
+    with patch("anthropic.Anthropic") as mock_cls:
+        mock_client = MagicMock()
+        mock_cls.return_value = mock_client
+        mock_client.messages.create.return_value = mock_response
+        results = analyze(articles)
+
+    assert len(results) == 1
+    assert results[0].source == "RealSource"
+    assert results[0].title == "Only article"

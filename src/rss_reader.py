@@ -31,7 +31,12 @@ def read_rss_feeds(config_path: str = "config.yaml") -> list[Article]:
             continue
         try:
             feed = feedparser.parse(url)
-            for entry in feed.entries:
+        except Exception as e:
+            logger.error("Failed to fetch feed %s: %s", url, e)
+            continue
+
+        for entry in feed.entries:
+            try:
                 if not entry.get("published_parsed"):
                     continue
                 published_at = datetime.fromtimestamp(
@@ -43,13 +48,13 @@ def read_rss_feeds(config_path: str = "config.yaml") -> list[Article]:
                 articles.append(
                     Article(
                         source=name,
-                        title=entry.title,
+                        title=getattr(entry, "title", "(no title)"),
                         content=content,
-                        url=entry.link,
+                        url=getattr(entry, "link", ""),
                         published_at=published_at,
                     )
                 )
-        except Exception as e:
-            logger.error("Failed to fetch feed %s: %s", url, e)
+            except Exception as e:
+                logger.warning("Skipping malformed RSS entry from %s: %s", name, e)
 
     return articles

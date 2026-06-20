@@ -1,3 +1,4 @@
+import html
 import logging
 import os
 from datetime import datetime, timezone
@@ -19,7 +20,7 @@ def format_report(results: list[AnalysisResult], total_analyzed: int) -> str:
     ignored = [r for r in results if r.relevance <= 5]
 
     lines = [
-        f"📊 *Inteligência Diária — {today}*\n",
+        f"📊 <b>Inteligência Diária — {today}</b>\n",
         f"Analisados: {total_analyzed} conteúdos | Importantes: {len(important)} | Ignorados: {len(ignored)}",
     ]
 
@@ -27,24 +28,24 @@ def format_report(results: list[AnalysisResult], total_analyzed: int) -> str:
         emoji = "🔴" if result.relevance >= 8 else "🟡"
         block = [
             f"\n{SEPARATOR}",
-            f"{emoji} *[{result.relevance}/10] {result.title}*",
-            f"📌 Fonte: {result.source}",
-            f"\n{result.summary}",
-            f"\nPor que importa: {result.why_it_matters}",
+            f"{emoji} <b>[{result.relevance}/10] {html.escape(result.title)}</b>",
+            f"📌 Fonte: {html.escape(result.source)}",
+            f"\n{html.escape(result.summary)}",
+            f"\nPor que importa: {html.escape(result.why_it_matters)}",
         ]
         if result.impacts:
             block.append("\nImpactos:")
-            block.extend(f"• {impact}" for impact in result.impacts)
+            block.extend(f"• {html.escape(impact)}" for impact in result.impacts)
         if result.actions:
             block.append("\nAções possíveis:")
-            block.extend(f"• {action}" for action in result.actions)
+            block.extend(f"• {html.escape(action)}" for action in result.actions)
         lines.extend(block)
 
     if ignored:
         lines.append(f"\n{SEPARATOR}")
-        lines.append(f"⚪ *Ignorados ({len(ignored)})*\n")
+        lines.append(f"⚪ <b>Ignorados ({len(ignored)})</b>\n")
         for result in ignored:
-            lines.append(f"• {result.summary or result.title} — {result.source}")
+            lines.append(f"• {html.escape(result.summary or result.title)} — {html.escape(result.source)}")
 
     return "\n".join(lines)
 
@@ -83,7 +84,7 @@ def send_report(results: list[AnalysisResult], total_analyzed: int) -> None:
         try:
             response = requests.post(
                 url,
-                json={"chat_id": chat_id, "text": message, "parse_mode": "Markdown"},
+                json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
                 timeout=10,
             )
             if not response.ok:

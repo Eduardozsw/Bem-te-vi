@@ -56,9 +56,17 @@ def _parse_response(text: str, batch: list[Article]) -> list[AnalysisResult]:
             raise
         data = json.loads(text[start:end])
 
+    if len(data) != len(batch):
+        logger.warning(
+            "Claude returned %d results for batch of %d articles; truncating/padding",
+            len(data), len(batch),
+        )
+
     results = []
     for i, item in enumerate(data):
-        article = batch[i] if i < len(batch) else batch[-1]
+        if i >= len(batch):
+            break  # never mis-attribute extras
+        article = batch[i]
         results.append(
             AnalysisResult(
                 title=item.get("title", article.title),

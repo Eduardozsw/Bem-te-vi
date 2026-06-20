@@ -21,6 +21,7 @@ def test_format_report_contains_header():
     report = format_report(results, total_analyzed=5)
     assert "Inteligência Diária" in report
     assert "Analisados: 5" in report
+    assert "<b>" in report  # HTML bold, not Markdown
 
 
 def test_format_report_red_high_relevance():
@@ -87,3 +88,34 @@ def test_send_report_calls_telegram_api():
     assert mock_post.called
     call_args = mock_post.call_args
     assert "sendMessage" in call_args[0][0]
+    payload = call_args[1]["json"]
+    assert payload["parse_mode"] == "HTML"
+
+
+def test_send_report_uses_html_parse_mode():
+    results = [_make_result("News", 8)]
+
+    with patch("requests.post") as mock_post, \
+         patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": "tok", "TELEGRAM_CHAT_ID": "1"}):
+        mock_post.return_value = MagicMock(ok=True)
+        send_report(results, total_analyzed=1)
+
+    payload = mock_post.call_args[1]["json"]
+    assert payload["parse_mode"] == "HTML"
+    assert "*" not in payload["text"]  # no raw Markdown bold in output
+
+
+def test_format_report_escapes_html_special_chars():
+    """Titles with HTML-special chars (<, >, &, ") must be escaped to prevent broken HTML."""
+    result = _make_result('Price cut <50% & "huge" impact > last year', 9)
+    report = format_report([result], total_analyzed=1)
+    # Raw HTML-special chars must not appear unescaped
+    assert "<50%" not in report
+    assert "&" not in report.replace("&amp;", "").replace("&lt;", "").replace("&gt;", "").replace("&quot;", "")
+    # Escaped versions must be present
+    assert "&lt;50%" in report
+    assert "&amp;" in report
+    assert "&gt;" in report
+    # HTML bold must be used, not Markdown bold
+    assert "<b>" in report
+    assert f"*[9/10]" not in report
