@@ -23,8 +23,12 @@ def read_rss_feeds(config_path: str = "config.yaml") -> list[Article]:
     articles: list[Article] = []
 
     for feed_cfg in feeds:
-        name = feed_cfg["name"]
-        url = feed_cfg["url"]
+        try:
+            name = feed_cfg["name"]
+            url = feed_cfg["url"]
+        except KeyError as e:
+            logger.warning("Skipping malformed feed config entry (missing key: %s)", e)
+            continue
         try:
             feed = feedparser.parse(url)
             for entry in feed.entries:
