@@ -10,6 +10,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
 from src.models import Article
+from src.run_status import RunStatus
 
 logger = logging.getLogger(__name__)
 
@@ -71,11 +72,13 @@ def _get_header(headers: list[dict], name: str) -> str:
     return ""
 
 
-def read_gmail(label: str = "newsletters") -> list[Article]:
+def read_gmail(label: str = "newsletters", status: RunStatus | None = None) -> list[Article]:
     try:
         service = _build_service()
     except Exception as e:
         logger.error("Failed to build Gmail service: %s", e)
+        if status is not None:
+            status.add("Gmail: falha de autenticação")
         return []
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
@@ -88,6 +91,8 @@ def read_gmail(label: str = "newsletters") -> list[Article]:
         )
         if not label_id:
             logger.warning("Gmail label '%s' not found", label)
+            if status is not None:
+                status.add(f"Gmail: label '{label}' não encontrada")
             return []
 
         messages_response = (
@@ -99,6 +104,8 @@ def read_gmail(label: str = "newsletters") -> list[Article]:
         messages = messages_response.get("messages", [])
     except Exception as e:
         logger.error("Failed to list Gmail messages: %s", e)
+        if status is not None:
+            status.add("Gmail: falha ao listar mensagens")
         return []
 
     articles: list[Article] = []

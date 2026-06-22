@@ -1,5 +1,7 @@
 import base64
 import json
+from datetime import datetime, timezone
+from email.utils import format_datetime
 from unittest.mock import patch, MagicMock
 from src.gmail_reader import extract_body, read_gmail
 from src.models import Article
@@ -56,7 +58,7 @@ def test_read_gmail_returns_articles():
             "headers": [
                 {"name": "Subject", "value": "Weekly Newsletter"},
                 {"name": "From", "value": "editor@example.com"},
-                {"name": "Date", "value": "Fri, 20 Jun 2026 08:00:00 +0000"},
+                {"name": "Date", "value": format_datetime(datetime.now(timezone.utc))},
             ],
         },
     }
@@ -69,3 +71,16 @@ def test_read_gmail_returns_articles():
     assert articles[0].source == "editor@example.com"
     assert "Newsletter content" in articles[0].content
     assert isinstance(articles[0], Article)
+
+
+def test_read_gmail_warns_when_label_missing():
+    from src.run_status import RunStatus
+    mock_service = MagicMock()
+    mock_service.users().labels().list().execute.return_value = {
+        "labels": [{"id": "X", "name": "outra"}]
+    }
+    status = RunStatus()
+    with patch("src.gmail_reader._build_service", return_value=mock_service):
+        articles = read_gmail("newsletters", status=status)
+    assert articles == []
+    assert any("newsletters" in w for w in status.warnings)
