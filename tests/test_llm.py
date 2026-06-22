@@ -59,3 +59,11 @@ def test_complete_returns_message_content():
     with patch.dict(os.environ, {}, clear=True), \
          patch("litellm.completion", return_value=_mock_completion("olá")):
         assert complete("sys", "usr") == "olá"
+
+
+def test_complete_raises_value_error_when_content_is_none():
+    with patch.dict(os.environ, {}, clear=True), \
+         patch("litellm.completion", return_value=_mock_completion(None)):
+        import pytest
+        with pytest.raises(ValueError, match="LLM returned empty content"):
+            complete("sys", "usr")

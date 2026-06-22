@@ -58,7 +58,7 @@ def _parse_response(text: str, batch: list[Article]) -> list[AnalysisResult]:
 
     if len(data) != len(batch):
         logger.warning(
-            "Claude returned %d results for batch of %d articles; truncating/padding",
+            "LLM returned %d results for batch of %d articles; truncating/padding",
             len(data), len(batch),
         )
 

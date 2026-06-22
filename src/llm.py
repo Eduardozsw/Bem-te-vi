@@ -21,4 +21,7 @@ def complete(system: str, user: str, max_tokens: int = 4096) -> str:
     if api_key:
         kwargs["api_key"] = api_key
     response = litellm.completion(**kwargs)
-    return response.choices[0].message.content
+    content = response.choices[0].message.content
+    if content is None:
+        raise ValueError("LLM returned empty content")
+    return content
