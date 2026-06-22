@@ -104,3 +104,14 @@ def test_bad_entry_does_not_kill_remaining_entries(tmp_path):
 
     assert len(articles) == 1
     assert articles[0].title == "Good article"
+
+
+def test_read_rss_warns_when_feed_down(tmp_path):
+    from src.run_status import RunStatus
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text("rss_feeds:\n  - name: TechCrunch\n    url: http://x/rss\n")
+    status = RunStatus()
+    with patch("feedparser.parse", side_effect=Exception("network error")):
+        articles = read_rss_feeds(str(config_file), status=status)
+    assert articles == []
+    assert any("TechCrunch" in w for w in status.warnings)

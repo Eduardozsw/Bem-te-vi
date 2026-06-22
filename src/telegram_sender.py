@@ -13,7 +13,7 @@ SEPARATOR = "━" * 22
 TELEGRAM_LIMIT = 4096
 
 
-def format_report(results: list[AnalysisResult], total_analyzed: int) -> str:
+def format_report(results: list[AnalysisResult], total_analyzed: int, warnings: list[str] | None = None) -> str:
     today = datetime.now(timezone.utc).strftime("%d/%m/%Y")
 
     important = [r for r in results if r.relevance >= 6]
@@ -29,7 +29,11 @@ def format_report(results: list[AnalysisResult], total_analyzed: int) -> str:
         block = [
             f"\n{SEPARATOR}",
             f"{emoji} <b>[{result.relevance}/10] {html.escape(result.title)}</b>",
-            f"📌 Fonte: {html.escape(result.source)}",
+            (
+                f"📌 Visto em: {', '.join(html.escape(s) for s in result.sources)}"
+                if len(result.sources) > 1
+                else f"📌 Fonte: {html.escape(result.source)}"
+            ),
             f"\n{html.escape(result.summary)}",
             f"\nPor que importa: {html.escape(result.why_it_matters)}",
         ]
@@ -46,6 +50,12 @@ def format_report(results: list[AnalysisResult], total_analyzed: int) -> str:
         lines.append(f"⚪ <b>Ignorados ({len(ignored)})</b>\n")
         for result in ignored:
             lines.append(f"• {html.escape(result.summary or result.title)} — {html.escape(result.source)}")
+
+    if warnings:
+        lines.append(f"\n{SEPARATOR}")
+        lines.append("⚠️ <b>Avisos</b>\n")
+        for w in warnings:
+            lines.append(f"• {html.escape(w)}")
 
     return "\n".join(lines)
 
@@ -69,25 +79,44 @@ def split_messages(text: str) -> list[str]:
     return parts
 
 
-def send_report(results: list[AnalysisResult], total_analyzed: int) -> None:
+def _post_message(token: str, chat_id: str, text: str) -> bool:
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    try:
+        response = requests.post(
+            url,
+            json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
+            timeout=10,
+        )
+        if not response.ok:
+            logger.error("Telegram API error: %s", response.text)
+            return False
+        return True
+    except Exception as e:
+        logger.error("Failed to send Telegram message: %s", e)
+        return False
+
+
+def send_report(results: list[AnalysisResult], total_analyzed: int, warnings: list[str] | None = None) -> bool:
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
     if not token or not chat_id:
         logger.error("TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set")
-        return
+        return False
 
-    report = format_report(results, total_analyzed)
+    report = format_report(results, total_analyzed, warnings)
     messages = split_messages(report)
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
 
+    all_ok = True
     for message in messages:
-        try:
-            response = requests.post(
-                url,
-                json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
-                timeout=10,
-            )
-            if not response.ok:
-                logger.error("Telegram API error: %s", response.text)
-        except Exception as e:
-            logger.error("Failed to send Telegram message: %s", e)
+        if not _post_message(token, chat_id, message):
+            all_ok = False
+    return all_ok
+
+
+def send_alert(text: str) -> bool:
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    if not token or not chat_id:
+        logger.error("TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set; cannot send alert")
+        return False
+    return _post_message(token, chat_id, html.escape(text))

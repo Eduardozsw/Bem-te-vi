@@ -6,16 +6,19 @@ import feedparser
 import yaml
 
 from src.models import Article
+from src.run_status import RunStatus
 
 logger = logging.getLogger(__name__)
 
 
-def read_rss_feeds(config_path: str = "config.yaml") -> list[Article]:
+def read_rss_feeds(config_path: str = "config.yaml", status: RunStatus | None = None) -> list[Article]:
     try:
         with open(config_path) as f:
             config = yaml.safe_load(f)
     except FileNotFoundError:
         logger.warning("config.yaml not found at %s", config_path)
+        if status is not None:
+            status.add("RSS: config.yaml não encontrado")
         return []
 
     feeds = config.get("rss_feeds", [])
@@ -33,6 +36,8 @@ def read_rss_feeds(config_path: str = "config.yaml") -> list[Article]:
             feed = feedparser.parse(url)
         except Exception as e:
             logger.error("Failed to fetch feed %s: %s", url, e)
+            if status is not None:
+                status.add(f"RSS '{name}': feed fora do ar")
             continue
 
         for entry in feed.entries:

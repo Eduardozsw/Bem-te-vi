@@ -1,5 +1,5 @@
 from unittest.mock import patch, MagicMock
-from src.telegram_sender import format_report, split_messages, send_report
+from src.telegram_sender import format_report, split_messages, send_report, send_alert
 from src.models import AnalysisResult
 
 
@@ -105,6 +105,22 @@ def test_send_report_uses_html_parse_mode():
     assert "*" not in payload["text"]  # no raw Markdown bold in output
 
 
+def test_format_report_multi_source_shows_visto_em():
+    result = _make_result("Big news", 9)
+    result.sources = ["TechCrunch", "HN", "Nord"]
+    report = format_report([result], total_analyzed=1)
+    assert "Visto em: TechCrunch, HN, Nord" in report
+    assert "📌 Fonte:" not in report
+
+
+def test_format_report_single_source_shows_fonte():
+    result = _make_result("News", 9)
+    result.sources = ["TechCrunch"]
+    report = format_report([result], total_analyzed=1)
+    assert "📌 Fonte: Test" in report  # usa result.source
+    assert "Visto em:" not in report
+
+
 def test_format_report_escapes_html_special_chars():
     """Titles with HTML-special chars (<, >, &, ") must be escaped to prevent broken HTML."""
     result = _make_result('Price cut <50% & "huge" impact > last year', 9)
@@ -119,3 +135,70 @@ def test_format_report_escapes_html_special_chars():
     # HTML bold must be used, not Markdown bold
     assert "<b>" in report
     assert f"*[9/10]" not in report
+
+
+def test_format_report_with_warnings_shows_footer():
+    result = _make_result("News", 8)
+    report = format_report([result], total_analyzed=1, warnings=["Gmail: label não encontrada"])
+    assert "Avisos" in report
+    assert "Gmail: label não encontrada" in report
+
+
+def test_format_report_without_warnings_no_footer():
+    result = _make_result("News", 8)
+    report = format_report([result], total_analyzed=1)
+    assert "Avisos" not in report
+
+
+def test_send_report_returns_true_on_success():
+    with patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": "t", "TELEGRAM_CHAT_ID": "1"}), \
+         patch("requests.post") as mock_post:
+        mock_post.return_value = MagicMock(ok=True)
+        ok = send_report([_make_result("N", 8)], total_analyzed=1)
+    assert ok is True
+
+
+def test_send_report_returns_false_on_api_failure():
+    with patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": "t", "TELEGRAM_CHAT_ID": "1"}), \
+         patch("requests.post") as mock_post:
+        mock_post.return_value = MagicMock(ok=False, text="403 Forbidden")
+        ok = send_report([_make_result("N", 8)], total_analyzed=1)
+    assert ok is False
+
+
+def test_send_report_returns_false_without_credentials():
+    with patch.dict("os.environ", {}, clear=True):
+        ok = send_report([_make_result("N", 8)], total_analyzed=1)
+    assert ok is False
+
+
+def test_send_alert_posts_and_returns_true():
+    from src.telegram_sender import send_alert
+    with patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": "t", "TELEGRAM_CHAT_ID": "1"}), \
+         patch("requests.post") as mock_post:
+        mock_post.return_value = MagicMock(ok=True)
+        ok = send_alert("🚨 Pipeline falhou: boom")
+    assert ok is True
+    assert "sendMessage" in mock_post.call_args[0][0]
+
+
+def test_send_alert_html_escapes_text():
+    """send_alert must HTML-escape its text so Telegram's HTML parser doesn't reject it.
+
+    Exception strings routinely contain <, >, and &. Without escaping, Telegram returns
+    a 400 and the crash alert is never delivered. Emojis and the prefix survive html.escape
+    unchanged, so the user-visible message is unaffected.
+    """
+    raw = "🚨 Pipeline falhou: KeyError <id> & stuff"
+    with patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": "t", "TELEGRAM_CHAT_ID": "1"}), \
+         patch("requests.post") as mock_post:
+        mock_post.return_value = MagicMock(ok=True)
+        send_alert(raw)
+
+    posted_text = mock_post.call_args[1]["json"]["text"]
+    # Raw HTML-special chars must not appear in the posted text
+    assert "<id>" not in posted_text
+    assert "& stuff" not in posted_text
+    # Escaped versions must be present
+    assert "&lt;id&gt;" in posted_text
+    assert "&amp;" in posted_text
