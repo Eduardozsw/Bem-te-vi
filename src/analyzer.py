@@ -79,6 +79,7 @@ def _parse_response(text: str, batch: list[Article]) -> list[AnalysisResult]:
                 why_it_matters=item.get("why_it_matters", ""),
                 impacts=item.get("impacts", []),
                 actions=item.get("actions", []),
+                sources=article.sources or [article.source],
             )
         )
     return results

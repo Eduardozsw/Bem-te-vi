@@ -147,3 +147,42 @@ def test_analyze_handles_more_results_than_articles():
     assert len(results) == 1
     assert results[0].source == "RealSource"
     assert results[0].title == "Only article"
+
+
+def test_analyze_propagates_sources_from_article():
+    import json as _json
+    article = _make_article("Multi-source news", "TechCrunch")
+    article.sources = ["TechCrunch", "HN"]
+
+    mock_response = MagicMock()
+    mock_response.content = [MagicMock(text=_json.dumps([
+        {"title": "Multi-source news", "relevance": 9, "summary": "s",
+         "why_it_matters": "w", "impacts": [], "actions": []}
+    ]))]
+
+    with patch("anthropic.Anthropic") as cls:
+        client = MagicMock()
+        cls.return_value = client
+        client.messages.create.return_value = mock_response
+        results = analyze([article])
+
+    assert results[0].sources == ["TechCrunch", "HN"]
+
+
+def test_analyze_defaults_sources_to_single_source():
+    import json as _json
+    article = _make_article("Single", "Nord")  # sources fica []
+
+    mock_response = MagicMock()
+    mock_response.content = [MagicMock(text=_json.dumps([
+        {"title": "Single", "relevance": 7, "summary": "s",
+         "why_it_matters": "w", "impacts": [], "actions": []}
+    ]))]
+
+    with patch("anthropic.Anthropic") as cls:
+        client = MagicMock()
+        cls.return_value = client
+        client.messages.create.return_value = mock_response
+        results = analyze([article])
+
+    assert results[0].sources == ["Nord"]
