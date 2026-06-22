@@ -8,3 +8,7 @@ __pycache__/
 dist/
 .venv/
 venv/
+
+# Claude Code / planning artifacts — keep local, never commit
+.superpowers/
+docs/superpowers/
