@@ -119,4 +119,4 @@ def send_alert(text: str) -> bool:
     if not token or not chat_id:
         logger.error("TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set; cannot send alert")
         return False
-    return _post_message(token, chat_id, text)
+    return _post_message(token, chat_id, html.escape(text))

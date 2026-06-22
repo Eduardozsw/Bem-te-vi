@@ -180,3 +180,25 @@ def test_send_alert_posts_and_returns_true():
         ok = send_alert("🚨 Pipeline falhou: boom")
     assert ok is True
     assert "sendMessage" in mock_post.call_args[0][0]
+
+
+def test_send_alert_html_escapes_text():
+    """send_alert must HTML-escape its text so Telegram's HTML parser doesn't reject it.
+
+    Exception strings routinely contain <, >, and &. Without escaping, Telegram returns
+    a 400 and the crash alert is never delivered. Emojis and the prefix survive html.escape
+    unchanged, so the user-visible message is unaffected.
+    """
+    raw = "🚨 Pipeline falhou: KeyError <id> & stuff"
+    with patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": "t", "TELEGRAM_CHAT_ID": "1"}), \
+         patch("requests.post") as mock_post:
+        mock_post.return_value = MagicMock(ok=True)
+        send_alert(raw)
+
+    posted_text = mock_post.call_args[1]["json"]["text"]
+    # Raw HTML-special chars must not appear in the posted text
+    assert "<id>" not in posted_text
+    assert "& stuff" not in posted_text
+    # Escaped versions must be present
+    assert "&lt;id&gt;" in posted_text
+    assert "&amp;" in posted_text
