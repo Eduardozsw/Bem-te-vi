@@ -29,7 +29,11 @@ def format_report(results: list[AnalysisResult], total_analyzed: int) -> str:
         block = [
             f"\n{SEPARATOR}",
             f"{emoji} <b>[{result.relevance}/10] {html.escape(result.title)}</b>",
-            f"📌 Fonte: {html.escape(result.source)}",
+            (
+                f"📌 Visto em: {', '.join(html.escape(s) for s in result.sources)}"
+                if len(result.sources) > 1
+                else f"📌 Fonte: {html.escape(result.source)}"
+            ),
             f"\n{html.escape(result.summary)}",
             f"\nPor que importa: {html.escape(result.why_it_matters)}",
         ]

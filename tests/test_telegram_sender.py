@@ -105,6 +105,22 @@ def test_send_report_uses_html_parse_mode():
     assert "*" not in payload["text"]  # no raw Markdown bold in output
 
 
+def test_format_report_multi_source_shows_visto_em():
+    result = _make_result("Big news", 9)
+    result.sources = ["TechCrunch", "HN", "Nord"]
+    report = format_report([result], total_analyzed=1)
+    assert "Visto em: TechCrunch, HN, Nord" in report
+    assert "📌 Fonte:" not in report
+
+
+def test_format_report_single_source_shows_fonte():
+    result = _make_result("News", 9)
+    result.sources = ["TechCrunch"]
+    report = format_report([result], total_analyzed=1)
+    assert "📌 Fonte: Test" in report  # usa result.source
+    assert "Visto em:" not in report
+
+
 def test_format_report_escapes_html_special_chars():
     """Titles with HTML-special chars (<, >, &, ") must be escaped to prevent broken HTML."""
     result = _make_result('Price cut <50% & "huge" impact > last year', 9)
