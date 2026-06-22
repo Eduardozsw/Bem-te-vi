@@ -9,3 +9,4 @@ beautifulsoup4>=4.12.0
 pyyaml>=6.0.0
 pytest>=8.0.0
 pytest-mock>=3.12.0
+litellm==1.89.3  # pinned; review on upgrade (litellm releases frequently)
