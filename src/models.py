@@ -9,6 +9,7 @@ class Article:
     content: str
     url: str
     published_at: datetime
+    sources: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -21,3 +22,4 @@ class AnalysisResult:
     why_it_matters: str
     impacts: list[str] = field(default_factory=list)
     actions: list[str] = field(default_factory=list)
+    sources: list[str] = field(default_factory=list)
