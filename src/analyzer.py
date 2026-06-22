@@ -39,6 +39,8 @@ You will receive a JSON array of articles. Return a JSON array with one result p
 ]
 
 For low-relevance items (score ≤ 5), keep summary very short (2-4 words). For high-relevance items (score ≥ 6), provide full analysis.
+
+LANGUAGE: Always write the "summary", "why_it_matters", "impacts", and "actions" fields in Brazilian Portuguese (pt-BR), regardless of the article's original language. Keep the "title" field in the article's original language.
 Return ONLY the JSON array. No markdown, no explanation."""
 
 
