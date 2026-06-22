@@ -1,5 +1,5 @@
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from datetime import datetime, timezone
 from src.analyzer import analyze, _build_batches
 from src.models import Article, AnalysisResult
@@ -30,28 +30,17 @@ def test_build_batches_empty():
 
 def test_analyze_returns_analysis_results():
     articles = [_make_article("OpenAI cuts API prices by 80%", "TechCrunch")]
-
-    mock_response = MagicMock()
-    mock_response.content = [
-        MagicMock(
-            text=json.dumps([
-                {
-                    "title": "OpenAI cuts API prices by 80%",
-                    "relevance": 9,
-                    "summary": "Major price cut for GPT APIs",
-                    "why_it_matters": "Reduces AI project costs significantly",
-                    "impacts": ["Cheaper AI projects", "More competition"],
-                    "actions": ["Review current API costs"],
-                }
-            ])
-        )
-    ]
-
-    with patch("anthropic.Anthropic") as mock_anthropic_cls:
-        mock_client = MagicMock()
-        mock_anthropic_cls.return_value = mock_client
-        mock_client.messages.create.return_value = mock_response
-
+    payload = json.dumps([
+        {
+            "title": "OpenAI cuts API prices by 80%",
+            "relevance": 9,
+            "summary": "Major price cut for GPT APIs",
+            "why_it_matters": "Reduces AI project costs significantly",
+            "impacts": ["Cheaper AI projects", "More competition"],
+            "actions": ["Review current API costs"],
+        }
+    ])
+    with patch("src.analyzer.complete", return_value=payload):
         results = analyze(articles)
 
     assert len(results) == 1
@@ -69,120 +58,56 @@ def test_analyze_empty_list():
 
 def test_analyze_handles_api_error():
     articles = [_make_article("Some article")]
-
-    with patch("anthropic.Anthropic") as mock_anthropic_cls:
-        mock_client = MagicMock()
-        mock_anthropic_cls.return_value = mock_client
-        mock_client.messages.create.side_effect = Exception("API error")
-
+    with patch("src.analyzer.complete", side_effect=Exception("API error")):
         results = analyze(articles)
-
     assert results == []
 
 
 def test_analyze_handles_fewer_results_than_articles():
-    """Claude returning fewer results than articles should not crash or mis-attribute."""
     articles = [_make_article(f"Article {i}") for i in range(3)]
-
-    mock_response = MagicMock()
-    mock_response.content = [
-        MagicMock(
-            text=json.dumps([
-                {
-                    "title": "Article 0",
-                    "relevance": 7,
-                    "summary": "summary",
-                    "why_it_matters": "matters",
-                    "impacts": [],
-                    "actions": [],
-                }
-            ])
-        )
-    ]
-
-    with patch("anthropic.Anthropic") as mock_cls:
-        mock_client = MagicMock()
-        mock_cls.return_value = mock_client
-        mock_client.messages.create.return_value = mock_response
+    payload = json.dumps([
+        {"title": "Article 0", "relevance": 7, "summary": "summary",
+         "why_it_matters": "matters", "impacts": [], "actions": []}
+    ])
+    with patch("src.analyzer.complete", return_value=payload):
         results = analyze(articles)
-
     assert len(results) == 1
     assert results[0].source == "Test"
 
 
 def test_analyze_handles_more_results_than_articles():
-    """Claude returning more results than articles should not mis-attribute extras."""
     articles = [_make_article("Only article", source="RealSource")]
-
-    mock_response = MagicMock()
-    mock_response.content = [
-        MagicMock(
-            text=json.dumps([
-                {
-                    "title": "Only article",
-                    "relevance": 7,
-                    "summary": "summary",
-                    "why_it_matters": "matters",
-                    "impacts": [],
-                    "actions": [],
-                },
-                {
-                    "title": "Extra article",
-                    "relevance": 5,
-                    "summary": "extra",
-                    "why_it_matters": "extra",
-                    "impacts": [],
-                    "actions": [],
-                },
-            ])
-        )
-    ]
-
-    with patch("anthropic.Anthropic") as mock_cls:
-        mock_client = MagicMock()
-        mock_cls.return_value = mock_client
-        mock_client.messages.create.return_value = mock_response
+    payload = json.dumps([
+        {"title": "Only article", "relevance": 7, "summary": "summary",
+         "why_it_matters": "matters", "impacts": [], "actions": []},
+        {"title": "Extra article", "relevance": 5, "summary": "extra",
+         "why_it_matters": "extra", "impacts": [], "actions": []},
+    ])
+    with patch("src.analyzer.complete", return_value=payload):
         results = analyze(articles)
-
     assert len(results) == 1
     assert results[0].source == "RealSource"
     assert results[0].title == "Only article"
 
 
 def test_analyze_propagates_sources_from_article():
-    import json as _json
     article = _make_article("Multi-source news", "TechCrunch")
     article.sources = ["TechCrunch", "HN"]
-
-    mock_response = MagicMock()
-    mock_response.content = [MagicMock(text=_json.dumps([
+    payload = json.dumps([
         {"title": "Multi-source news", "relevance": 9, "summary": "s",
          "why_it_matters": "w", "impacts": [], "actions": []}
-    ]))]
-
-    with patch("anthropic.Anthropic") as cls:
-        client = MagicMock()
-        cls.return_value = client
-        client.messages.create.return_value = mock_response
+    ])
+    with patch("src.analyzer.complete", return_value=payload):
         results = analyze([article])
-
     assert results[0].sources == ["TechCrunch", "HN"]
 
 
 def test_analyze_defaults_sources_to_single_source():
-    import json as _json
-    article = _make_article("Single", "Nord")  # sources fica []
-
-    mock_response = MagicMock()
-    mock_response.content = [MagicMock(text=_json.dumps([
+    article = _make_article("Single", "Nord")
+    payload = json.dumps([
         {"title": "Single", "relevance": 7, "summary": "s",
          "why_it_matters": "w", "impacts": [], "actions": []}
-    ]))]
-
-    with patch("anthropic.Anthropic") as cls:
-        client = MagicMock()
-        cls.return_value = client
-        client.messages.create.return_value = mock_response
+    ])
+    with patch("src.analyzer.complete", return_value=payload):
         results = analyze([article])
-
     assert results[0].sources == ["Nord"]

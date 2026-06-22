@@ -1,9 +1,7 @@
 import json
 import logging
-import os
 
-import anthropic
-
+from src.llm import complete
 from src.models import Article, AnalysisResult
 
 logger = logging.getLogger(__name__)
@@ -60,7 +58,7 @@ def _parse_response(text: str, batch: list[Article]) -> list[AnalysisResult]:
 
     if len(data) != len(batch):
         logger.warning(
-            "Claude returned %d results for batch of %d articles; truncating/padding",
+            "LLM returned %d results for batch of %d articles; truncating/padding",
             len(data), len(batch),
         )
 
@@ -89,7 +87,6 @@ def analyze(articles: list[Article]) -> list[AnalysisResult]:
     if not articles:
         return []
 
-    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     batches = _build_batches(articles, batch_size=10)
     all_results: list[AnalysisResult] = []
 
@@ -99,21 +96,12 @@ def analyze(articles: list[Article]) -> list[AnalysisResult]:
             for a in batch
         ]
         try:
-            response = client.messages.create(
-                model="claude-haiku-4-5-20251001",
+            text = complete(
+                SYSTEM_PROMPT,
+                json.dumps(payload, ensure_ascii=False),
                 max_tokens=4096,
-                system=[
-                    {
-                        "type": "text",
-                        "text": SYSTEM_PROMPT,
-                        "cache_control": {"type": "ephemeral"},
-                    }
-                ],
-                messages=[
-                    {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}
-                ],
             )
-            results = _parse_response(response.content[0].text, batch)
+            results = _parse_response(text, batch)
             all_results.extend(results)
         except Exception as e:
             logger.error("Analyzer batch failed: %s", e)

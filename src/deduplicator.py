@@ -1,9 +1,7 @@
 import json
 import logging
-import os
 
-import anthropic
-
+from src.llm import complete
 from src.models import Article
 from src.run_status import RunStatus
 
@@ -54,22 +52,12 @@ def deduplicate(articles: list[Article], status: RunStatus | None = None) -> lis
         for i, a in enumerate(articles)
     ]
     try:
-        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+        text = complete(
+            DEDUP_PROMPT,
+            json.dumps(payload, ensure_ascii=False),
             max_tokens=2048,
-            system=[
-                {
-                    "type": "text",
-                    "text": DEDUP_PROMPT,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ],
-            messages=[
-                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}
-            ],
         )
-        groups = _parse_groups(response.content[0].text, len(articles))
+        groups = _parse_groups(text, len(articles))
     except Exception as e:
         logger.error("Deduplication failed, falling back to no-dedup: %s", e)
         if status is not None:
