@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timezone
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from src.deduplicator import deduplicate
 from src.models import Article
@@ -15,28 +15,18 @@ def _make_article(title: str, source: str, content: str) -> Article:
     )
 
 
-def _mock_groups_response(groups):
-    response = MagicMock()
-    response.content = [MagicMock(text=json.dumps(groups))]
-    return response
-
-
 def test_deduplicate_groups_same_story():
     articles = [
         _make_article("OpenAI cuts prices", "TechCrunch", "long content here xxxx"),
         _make_article("Random unrelated", "HN", "other"),
         _make_article("OpenAI price cut", "Nord", "short"),
     ]
-    with patch("anthropic.Anthropic") as cls:
-        client = MagicMock()
-        cls.return_value = client
-        client.messages.create.return_value = _mock_groups_response([[0, 2], [1]])
+    with patch("src.deduplicator.complete", return_value=json.dumps([[0, 2], [1]])):
         result = deduplicate(articles)
 
     assert len(result) == 2
-    # grupo [0,2]: representante é o de maior content (índice 0)
     rep = next(r for r in result if r.title == "OpenAI cuts prices")
-    assert rep.sources == ["Nord", "TechCrunch"]  # ordenado, sem repetição
+    assert rep.sources == ["Nord", "TechCrunch"]
 
 
 def test_representative_is_longest_content():
@@ -44,10 +34,7 @@ def test_representative_is_longest_content():
         _make_article("A", "S1", "short"),
         _make_article("B", "S2", "a much longer body of content"),
     ]
-    with patch("anthropic.Anthropic") as cls:
-        client = MagicMock()
-        cls.return_value = client
-        client.messages.create.return_value = _mock_groups_response([[0, 1]])
+    with patch("src.deduplicator.complete", return_value=json.dumps([[0, 1]])):
         result = deduplicate(articles)
 
     assert len(result) == 1
@@ -65,13 +52,10 @@ def test_deduplicate_fallback_on_error_sets_sources_and_warns():
         _make_article("B", "S2", "y"),
     ]
     status = RunStatus()
-    with patch("anthropic.Anthropic") as cls:
-        client = MagicMock()
-        cls.return_value = client
-        client.messages.create.side_effect = Exception("API down")
+    with patch("src.deduplicator.complete", side_effect=Exception("API down")):
         result = deduplicate(articles, status=status)
 
-    assert len(result) == 2  # nada perdido
+    assert len(result) == 2
     assert result[0].sources == ["S1"]
     assert result[1].sources == ["S2"]
     assert len(status.warnings) == 1
@@ -83,13 +67,9 @@ def test_deduplicate_fills_missing_indices_as_singletons():
         _make_article("B", "S2", "y"),
         _make_article("C", "S3", "z"),
     ]
-    with patch("anthropic.Anthropic") as cls:
-        client = MagicMock()
-        cls.return_value = client
-        # modelo esqueceu o índice 2
-        client.messages.create.return_value = _mock_groups_response([[0, 1]])
+    with patch("src.deduplicator.complete", return_value=json.dumps([[0, 1]])):
         result = deduplicate(articles)
 
-    assert len(result) == 2  # grupo [0,1] + singleton [2]
+    assert len(result) == 2
     titles = {r.title for r in result}
     assert "C" in titles
