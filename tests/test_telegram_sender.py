@@ -202,3 +202,25 @@ def test_send_alert_html_escapes_text():
     # Escaped versions must be present
     assert "&lt;id&gt;" in posted_text
     assert "&amp;" in posted_text
+
+
+def test_format_report_renders_affects_tag():
+    from src.models import AnalysisResult
+    from src.telegram_sender import format_report
+    r = AnalysisResult(
+        title="Qwen 3B", source="HN", url="u", relevance=8,
+        summary="s", why_it_matters="w", affects=["MindDoc", "Cripto"],
+    )
+    report = format_report([r], total_analyzed=1)
+    assert "🏷️ Afeta: MindDoc, Cripto" in report
+
+
+def test_format_report_omits_tag_when_no_affects():
+    from src.models import AnalysisResult
+    from src.telegram_sender import format_report
+    r = AnalysisResult(
+        title="Generic", source="HN", url="u", relevance=8,
+        summary="s", why_it_matters="w",
+    )
+    report = format_report([r], total_analyzed=1)
+    assert "Afeta:" not in report
