@@ -23,3 +23,4 @@ class AnalysisResult:
     impacts: list[str] = field(default_factory=list)
     actions: list[str] = field(default_factory=list)
     sources: list[str] = field(default_factory=list)
+    affects: list[str] = field(default_factory=list)

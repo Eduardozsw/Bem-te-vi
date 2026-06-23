@@ -1,5 +1,6 @@
 import json
 import logging
+import yaml
 
 from src.llm import complete
 from src.models import Article, AnalysisResult
@@ -42,6 +43,22 @@ LANGUAGE: Always write the "summary", "why_it_matters", "impacts", and "actions"
 Return ONLY the JSON array. No markdown, no explanation."""
 
 
+def _profile_block(profile: dict) -> str:
+    if not profile:
+        return ""
+    rendered = yaml.safe_dump(profile, allow_unicode=True, sort_keys=False)
+    return (
+        "\n\nUSER PROFILE: The reader has the following projects/assets/interests. "
+        "When an article is relevant to a NAMED item below, put that exact name in "
+        "the \"affects\" array and write \"why_it_matters\"/\"actions\" from the "
+        "perspective of that item. If nothing applies, leave \"affects\" empty.\n"
+        f"{rendered}"
+        "\n\nFor each result object, add an \"affects\" field (array of strings) listing "
+        "the exact names from the profile above that this article touches. Use an empty "
+        "array if none apply."
+    )
+
+
 def _build_batches(articles: list[Article], batch_size: int = 10) -> list[list[Article]]:
     return [articles[i : i + batch_size] for i in range(0, len(articles), batch_size)]
 
@@ -78,15 +95,17 @@ def _parse_response(text: str, batch: list[Article]) -> list[AnalysisResult]:
                 impacts=item.get("impacts", []),
                 actions=item.get("actions", []),
                 sources=article.sources or [article.source],
+                affects=item.get("affects", []) or [],
             )
         )
     return results
 
 
-def analyze(articles: list[Article]) -> list[AnalysisResult]:
+def analyze(articles: list[Article], profile: dict | None = None) -> list[AnalysisResult]:
     if not articles:
         return []
 
+    system_prompt = SYSTEM_PROMPT + _profile_block(profile or {})
     batches = _build_batches(articles, batch_size=10)
     all_results: list[AnalysisResult] = []
 
@@ -97,7 +116,7 @@ def analyze(articles: list[Article]) -> list[AnalysisResult]:
         ]
         try:
             text = complete(
-                SYSTEM_PROMPT,
+                system_prompt,
                 json.dumps(payload, ensure_ascii=False),
                 max_tokens=4096,
             )

@@ -53,3 +53,21 @@ def test_analysis_result_has_sources_default_empty():
         summary="s", why_it_matters="w",
     )
     assert result.sources == []
+
+
+def test_analysis_result_affects_defaults_empty():
+    from src.models import AnalysisResult
+    r = AnalysisResult(
+        title="t", source="s", url="u", relevance=7,
+        summary="sum", why_it_matters="why",
+    )
+    assert r.affects == []
+
+
+def test_analysis_result_accepts_affects():
+    from src.models import AnalysisResult
+    r = AnalysisResult(
+        title="t", source="s", url="u", relevance=7,
+        summary="sum", why_it_matters="why", affects=["MindDoc"],
+    )
+    assert r.affects == ["MindDoc"]
