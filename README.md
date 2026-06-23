@@ -15,6 +15,7 @@ O bem-te-vi é um passarinho brasileiro cujo nome quer dizer literalmente *"bem 
 - 📱 Relatório diário formatado no Telegram
 - ☁️ Roda de graça no GitHub Actions (agendado)
 - 🔌 IA na **nuvem** (Anthropic) ou **local** (Ollama e afins) — sua escolha
+- 👤 Perfil opcional: marca **qual projeto/ativo seu** cada notícia afeta
 
 ## 🔍 Como funciona
 
@@ -38,21 +39,30 @@ python main.py
 
 | Variável | Obrigatória | Descrição |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | se usar a nuvem | Chave da API da Anthropic |
 | `TELEGRAM_BOT_TOKEN` | sim | Token do bot (via @BotFather) |
 | `TELEGRAM_CHAT_ID` | sim | Seu chat id no Telegram |
 | `GMAIL_LABEL` | não | Marcador lido no Gmail (default: `newsletters`) |
-| `LLM_MODEL` | não | Modelo no formato LiteLLM (default: `claude-haiku-4-5-20251001`) |
+| `LLM_MODEL` | não | Modelo no formato LiteLLM (default: `gpt-4o-mini`) |
+| `LLM_API_KEY` | se usar nuvem | Chave do provedor de IA (OpenAI, Anthropic, OpenRouter…) |
 | `LLM_API_BASE` | só local | Endpoint do provedor local (ex: `http://localhost:11434`) |
-| `LLM_API_KEY` | depende | Chave para provedores que exigem (ex: OpenRouter) |
 | `USER_PROFILE` | não | Perfil em YAML (uso como secret no Actions; local use `profile.yaml`) |
 
 ## 🧠 Escolha do modelo
 
-**Nuvem (Anthropic) — default, zero setup local:**
+Usa [LiteLLM](https://docs.litellm.ai/) — qualquer provedor suportado por ele
+funciona (OpenAI, Anthropic, OpenRouter, Gemini, Ollama local…). É só apontar
+`LLM_MODEL` para a string certa e dar a chave em `LLM_API_KEY`.
+
+**Nuvem — default `gpt-4o-mini` (OpenAI), bom custo-benefício:**
 ```
-ANTHROPIC_API_KEY=sk-ant-...
-# LLM_MODEL já é o Haiku por padrão
+LLM_MODEL=gpt-4o-mini
+LLM_API_KEY=sk-...
+```
+
+**Nuvem — Anthropic (alternativa):**
+```
+LLM_MODEL=claude-haiku-4-5-20251001
+LLM_API_KEY=sk-ant-...
 ```
 
 **Local (Ollama) — grátis, sem chave de API:**
@@ -69,15 +79,44 @@ LLM_API_BASE=http://localhost:11434
 ## 👤 Perfil personalizado (opcional)
 
 Por padrão a análise é genérica. Se você contar ao bot sobre seus projetos e
-investimentos, ele passa a marcar **quais deles cada notícia afeta** (`🏷️ Afeta: …`)
-e escreve as ações sob a sua ótica.
+investimentos, ele passa a marcar **quais deles cada notícia afeta**
+(`🏷️ Afeta: …`) e escreve o "por que importa" e as ações sob a sua ótica.
+
+O perfil é um **dicionário aninhado livre** — cada projeto/ativo é uma entrada
+nomeada com os campos que você quiser. O nome da entrada é o que aparece na tag.
+
+```yaml
+# profile.yaml
+projetos:
+  MeuApp:
+    descricao: "o que o projeto faz"
+    stack: "tecnologias relevantes, ex: depende de LLMs locais"
+    o_que_me_importa: "custo de inferência, modelos pequenos bons"
+investimentos:
+  renda_fixa:
+    posicoes: "CDB de liquidez diária, RDB"
+    o_que_me_importa: "Selic, CDI, IPCA — afetam o rendimento"
+```
+
+Aí uma notícia relevante chega assim:
+
+```
+🔴 [8/10] Novo modelo Qwen 3B supera Llama 8B
+🏷️ Afeta: MeuApp
+📌 Fonte: Hacker News
+
+Por que importa: roda no seu hardware atual com menos VRAM.
+Ações possíveis:
+• Testar qwen3:3b no MeuApp
+```
 
 **Local:** copie `profile.example.yaml` para `profile.yaml` e edite. O arquivo é
 ignorado pelo Git — seus dados ficam só na sua máquina.
 
 **No GitHub Actions:** cole o conteúdo do perfil no secret `USER_PROFILE`.
 
-Sem perfil, nada muda — segue genérico.
+Sem perfil (arquivo ausente e secret vazio), nada muda — a análise segue
+genérica, idêntica ao comportamento sem essa funcionalidade.
 
 ## 💻 Hardware
 
@@ -85,13 +124,11 @@ Escolha o modelo conforme sua máquina:
 
 | Hardware | `LLM_MODEL` | `LLM_API_BASE` | Nota |
 |---|---|---|---|
-| Nuvem (qualquer máquina) | `claude-haiku-4-5-20251001` *(default)* | — | precisa `ANTHROPIC_API_KEY` |
+| Nuvem (qualquer máquina) | `gpt-4o-mini` *(default)* ou `claude-haiku-4-5-20251001` | — | precisa `LLM_API_KEY` |
 | CPU apenas | `ollama/qwen2.5:3b` | `http://localhost:11434` | funciona, lento |
 | GPU 6–8 GB | `ollama/qwen2.5:7b` | `http://localhost:11434` | recomendado p/ maioria |
 | GPU 12–16 GB | `ollama/qwen2.5:14b` | `http://localhost:11434` | melhor qualidade |
-| GPU 24 GB+ | `ollama/qwen2.5:32b` | `http://localhost:11434` | mais perto do Haiku |
-
-Como usa LiteLLM, qualquer provedor suportado por ele funciona (OpenAI, OpenRouter, Gemini, etc.) — basta a string certa em `LLM_MODEL`.
+| GPU 24 GB+ | `ollama/qwen2.5:32b` | `http://localhost:11434` | mais perto da nuvem |
 
 ## 📧 Setup do Gmail
 
@@ -115,10 +152,11 @@ Como usa LiteLLM, qualquer provedor suportado por ele funciona (OpenAI, OpenRout
 
 O workflow `.github/workflows/daily.yml` roda diariamente. Configure os *secrets* do repositório:
 
-- `ANTHROPIC_API_KEY`
+- `LLM_API_KEY` (chave do seu provedor de IA — OpenAI, Anthropic…)
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
 - `GMAIL_TOKEN_JSON` (conteúdo do `token.json` gerado localmente)
+- `USER_PROFILE` (opcional — conteúdo do seu `profile.yaml` para análise personalizada)
 
 ## 🤝 Contribuindo
 
