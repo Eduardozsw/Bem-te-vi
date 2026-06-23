@@ -162,3 +162,26 @@ def test_affects_defaults_empty_when_model_omits_it():
     with patch("src.analyzer.complete", return_value=payload):
         results = analyze(articles, profile={"projetos": {"X": {}}})
     assert results[0].affects == []
+
+
+def test_profile_adds_affects_to_schema():
+    articles = [_make_article("Some local model news")]
+    payload = json.dumps([
+        {"title": "Some local model news", "relevance": 8, "summary": "s",
+         "why_it_matters": "w", "impacts": [], "actions": [], "affects": ["Bem-te-vi"]}
+    ])
+    captured = {}
+
+    def fake_complete(system, user, max_tokens=4096):
+        captured["system"] = system
+        return payload
+
+    profile = {"projetos": {"Bem-te-vi": {"o_que_me_importa": "modelos locais"}}}
+    with patch("src.analyzer.complete", side_effect=fake_complete):
+        results = analyze(articles, profile=profile)
+
+    system = captured["system"]
+    assert '"affects"' in system
+    # affects must be in the JSON schema example, before the profile context block
+    assert system.index('"affects"') < system.index("USER PROFILE")
+    assert results[0].affects == ["Bem-te-vi"]

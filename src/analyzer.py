@@ -59,6 +59,17 @@ def _profile_block(profile: dict) -> str:
     )
 
 
+def _system_prompt(profile: dict) -> str:
+    if not profile:
+        return SYSTEM_PROMPT
+    schema = SYSTEM_PROMPT.replace(
+        '    "actions": ["<possible action 1>"]',
+        '    "actions": ["<possible action 1>"],\n'
+        '    "affects": ["<exact names from the user profile this item touches; [] if none>"]',
+    )
+    return schema + _profile_block(profile)
+
+
 def _build_batches(articles: list[Article], batch_size: int = 10) -> list[list[Article]]:
     return [articles[i : i + batch_size] for i in range(0, len(articles), batch_size)]
 
@@ -105,7 +116,7 @@ def analyze(articles: list[Article], profile: dict | None = None) -> list[Analys
     if not articles:
         return []
 
-    system_prompt = SYSTEM_PROMPT + _profile_block(profile or {})
+    system_prompt = _system_prompt(profile or {})
     batches = _build_batches(articles, batch_size=10)
     all_results: list[AnalysisResult] = []
 
