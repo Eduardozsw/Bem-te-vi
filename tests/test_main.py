@@ -34,7 +34,8 @@ def test_main_orchestrates_pipeline_with_dedup():
         main.main()
 
     mock_dedup.assert_called_once()
-    mock_analyze.assert_called_once_with(deduped)
+    mock_analyze.assert_called_once()
+    assert mock_analyze.call_args.args[0] == deduped
     mock_send.assert_called_once()
     assert mock_send.call_args.kwargs["total_analyzed"] == 1
 
@@ -48,7 +49,8 @@ def test_main_handles_empty_sources():
         import main
         main.main()
 
-    mock_analyze.assert_called_once_with([])
+    mock_analyze.assert_called_once()
+    assert mock_analyze.call_args.args[0] == []
     assert mock_send.call_args.kwargs["total_analyzed"] == 0
 
 
@@ -74,3 +76,18 @@ def test_main_exits_when_delivery_fails():
             main.main()
 
     assert exc.value.code == 1
+
+
+def test_main_loads_profile_and_passes_to_analyze():
+    from unittest.mock import patch, MagicMock
+    import main as main_module
+    with patch.object(main_module, "read_gmail", return_value=[]), \
+         patch.object(main_module, "read_rss_feeds", return_value=[]), \
+         patch.object(main_module, "deduplicate", return_value=[]), \
+         patch.object(main_module, "send_report", return_value=True), \
+         patch.object(main_module, "load_profile", return_value={"projetos": {"X": {}}}) as lp, \
+         patch.object(main_module, "analyze", return_value=[]) as az:
+        main_module.main()
+    lp.assert_called_once()
+    assert az.call_args.kwargs.get("profile") == {"projetos": {"X": {}}} \
+        or az.call_args.args[1] == {"projetos": {"X": {}}}

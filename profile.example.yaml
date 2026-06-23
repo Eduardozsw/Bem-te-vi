@@ -1,0 +1,12 @@
+# Perfil do usuário (OPCIONAL). Copie para profile.yaml e edite.
+# Vazio/ausente = análise genérica (comportamento padrão).
+# profile.yaml é ignorado pelo Git — seus dados não vão pro repositório.
+# No GitHub Actions, cole o conteúdo deste arquivo no secret USER_PROFILE.
+projetos:
+  MeuApp:
+    descricao: "o que o projeto faz"
+    stack: "tecnologias relevantes, ex: depende de LLMs locais"
+    o_que_me_importa: "o que te interessa nas notícias sobre ele"
+investimentos:
+  cripto: "ex: posição em BTC/ETH"
+  acoes: "ex: tech US"

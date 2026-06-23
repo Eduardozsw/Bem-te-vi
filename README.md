@@ -45,6 +45,7 @@ python main.py
 | `LLM_MODEL` | não | Modelo no formato LiteLLM (default: `claude-haiku-4-5-20251001`) |
 | `LLM_API_BASE` | só local | Endpoint do provedor local (ex: `http://localhost:11434`) |
 | `LLM_API_KEY` | depende | Chave para provedores que exigem (ex: OpenRouter) |
+| `USER_PROFILE` | não | Perfil em YAML (uso como secret no Actions; local use `profile.yaml`) |
 
 ## 🧠 Escolha do modelo
 
@@ -64,6 +65,19 @@ ollama pull qwen2.5:7b
 LLM_MODEL=ollama/qwen2.5:7b
 LLM_API_BASE=http://localhost:11434
 ```
+
+## 👤 Perfil personalizado (opcional)
+
+Por padrão a análise é genérica. Se você contar ao bot sobre seus projetos e
+investimentos, ele passa a marcar **quais deles cada notícia afeta** (`🏷️ Afeta: …`)
+e escreve as ações sob a sua ótica.
+
+**Local:** copie `profile.example.yaml` para `profile.yaml` e edite. O arquivo é
+ignorado pelo Git — seus dados ficam só na sua máquina.
+
+**No GitHub Actions:** cole o conteúdo do perfil no secret `USER_PROFILE`.
+
+Sem perfil, nada muda — segue genérico.
 
 ## 💻 Hardware
 

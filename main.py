@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from src.analyzer import analyze
 from src.deduplicator import deduplicate
 from src.gmail_reader import read_gmail
+from src.profile import load_profile
 from src.rss_reader import read_rss_feeds
 from src.run_status import RunStatus
 from src.telegram_sender import send_alert, send_report
@@ -41,7 +42,11 @@ def main() -> None:
         deduped = deduplicate(all_articles, status=status)
         logger.info("After dedup: %d distinct items", len(deduped))
 
-        results = analyze(deduped)
+        profile = load_profile()
+        if profile:
+            logger.info("Loaded user profile with %d top-level keys", len(profile))
+
+        results = analyze(deduped, profile=profile)
         logger.info("Analysis complete. Sending report...")
 
         delivered = send_report(
