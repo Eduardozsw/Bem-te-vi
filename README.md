@@ -82,6 +82,11 @@ Por padrão a análise é genérica. Se você contar ao bot sobre seus projetos 
 investimentos, ele passa a marcar **quais deles cada notícia afeta**
 (`🏷️ Afeta: …`) e escreve o "por que importa" e as ações sob a sua ótica.
 
+> ⚠️ **A personalização só acontece com o perfil definido.** Sem `profile.yaml`
+> (local) ou o secret `USER_PROFILE` (no Actions), o bot roda normalmente, mas
+> **sem as tags `🏷️ Afeta` e sem as ações sob medida** — a análise fica genérica.
+> Quer o relatório personalizado? O perfil é obrigatório.
+
 O perfil é um **dicionário aninhado livre** — cada projeto/ativo é uma entrada
 nomeada com os campos que você quiser. O nome da entrada é o que aparece na tag.
 
