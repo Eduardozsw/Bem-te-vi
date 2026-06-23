@@ -33,8 +33,7 @@ You will receive a JSON array of articles. Return a JSON array with one result p
     "summary": "<2-3 word summary for low-relevance items, 1-2 sentences for high-relevance>",
     "why_it_matters": "<one sentence explaining why this matters>",
     "impacts": ["<impact 1>", "<impact 2>"],
-    "actions": ["<possible action 1>"],
-    "affects": ["<names of user's projects/assets this item touches, if any>"]
+    "actions": ["<possible action 1>"]
   }
 ]
 
@@ -54,6 +53,9 @@ def _profile_block(profile: dict) -> str:
         "the \"affects\" array and write \"why_it_matters\"/\"actions\" from the "
         "perspective of that item. If nothing applies, leave \"affects\" empty.\n"
         f"{rendered}"
+        "\n\nFor each result object, add an \"affects\" field (array of strings) listing "
+        "the exact names from the profile above that this article touches. Use an empty "
+        "array if none apply."
     )
 
 
