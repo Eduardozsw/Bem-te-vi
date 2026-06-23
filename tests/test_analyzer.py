@@ -111,3 +111,54 @@ def test_analyze_defaults_sources_to_single_source():
     with patch("src.analyzer.complete", return_value=payload):
         results = analyze([article])
     assert results[0].sources == ["Nord"]
+
+
+def test_empty_profile_leaves_prompt_unchanged_and_affects_empty():
+    from src.analyzer import SYSTEM_PROMPT
+    articles = [_make_article("Some news")]
+    payload = json.dumps([
+        {"title": "Some news", "relevance": 7, "summary": "s",
+         "why_it_matters": "w", "impacts": [], "actions": []}
+    ])
+    captured = {}
+
+    def fake_complete(system, user, max_tokens=4096):
+        captured["system"] = system
+        return payload
+
+    with patch("src.analyzer.complete", side_effect=fake_complete):
+        results = analyze(articles, profile={})
+
+    assert captured["system"] == SYSTEM_PROMPT
+    assert results[0].affects == []
+
+
+def test_profile_is_injected_into_system_prompt():
+    articles = [_make_article("Qwen 3B beats Llama 8B")]
+    payload = json.dumps([
+        {"title": "Qwen 3B beats Llama 8B", "relevance": 8, "summary": "s",
+         "why_it_matters": "w", "impacts": [], "actions": [], "affects": ["MindDoc"]}
+    ])
+    captured = {}
+
+    def fake_complete(system, user, max_tokens=4096):
+        captured["system"] = system
+        return payload
+
+    profile = {"projetos": {"MindDoc": {"stack": "LLMs locais"}}}
+    with patch("src.analyzer.complete", side_effect=fake_complete):
+        results = analyze(articles, profile=profile)
+
+    assert "MindDoc" in captured["system"]
+    assert results[0].affects == ["MindDoc"]
+
+
+def test_affects_defaults_empty_when_model_omits_it():
+    articles = [_make_article("News")]
+    payload = json.dumps([
+        {"title": "News", "relevance": 7, "summary": "s",
+         "why_it_matters": "w", "impacts": [], "actions": []}
+    ])
+    with patch("src.analyzer.complete", return_value=payload):
+        results = analyze(articles, profile={"projetos": {"X": {}}})
+    assert results[0].affects == []
