@@ -13,7 +13,7 @@ O bem-te-vi é um passarinho brasileiro cujo nome quer dizer literalmente *"bem 
 - 📥 Coleta de newsletters do Gmail (por marcador) + feeds RSS
 - 🧠 Análise e pontuação de relevância com IA
 - 🔗 Deduplicação semântica (a mesma notícia de várias fontes vira um item só)
-- 📱 Relatório diário formatado no Telegram
+- 📱 Relatório diário enxuto no Telegram: só os melhores itens, com link para a fonte
 - ☁️ Roda de graça no GitHub Actions (agendado)
 - 🔌 IA na **nuvem** (OpenAI, Anthropic, OpenRouter…) ou **local** (Ollama e afins) — sua escolha
 - 🔁 Retries com backoff e timeout nas chamadas de IA; falhas parciais aparecem no relatório
@@ -53,6 +53,18 @@ python main.py
 | `LLM_NUM_RETRIES` | não | Tentativas extras em erros transitórios da IA (default: `3`) |
 | `LLM_TIMEOUT` | não | Timeout por chamada à IA, em segundos (default: `60`) |
 | `RUNS_DB` | não | Caminho do SQLite com o registro de execuções (default: `data/runs.db`) |
+| `REPORT_MIN_RELEVANCE` | não | Nota mínima (0–10) para um item entrar no relatório (default: `7`) |
+| `REPORT_MAX_HIGHLIGHTS` | não | Quantos itens aparecem com análise completa (default: `5`) |
+
+## 📱 O relatório
+
+- Os itens com nota ≥ `REPORT_MIN_RELEVANCE` são ordenados pela nota. Os `REPORT_MAX_HIGHLIGHTS`
+  primeiros saem com a análise completa (resumo, por que importa, impactos, ações).
+- Os demais itens relevantes aparecem em **➕ Também relevantes**, uma linha cada (até 10).
+- O que ficou abaixo do corte só é **contado** no cabeçalho, sem lista.
+- Todo título é um link: o artigo, para RSS; a mensagem no Gmail, para newsletters (abre na
+  primeira conta logada no navegador, `u/0`).
+- Em dia sem nada relevante, o relatório diz isso numa linha em vez de encher a mensagem.
 
 ## 🧠 Escolha do modelo
 

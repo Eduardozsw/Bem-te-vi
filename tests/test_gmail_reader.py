@@ -70,6 +70,7 @@ def test_read_gmail_returns_articles():
     assert articles[0].title == "Weekly Newsletter"
     assert articles[0].source == "editor@example.com"
     assert "Newsletter content" in articles[0].content
+    assert articles[0].url == "https://mail.google.com/mail/u/0/#all/msg1"
     assert isinstance(articles[0], Article)
 
 

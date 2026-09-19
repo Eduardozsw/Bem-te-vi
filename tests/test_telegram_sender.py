@@ -32,20 +32,31 @@ def test_format_report_red_high_relevance():
     assert "Critical news" in report
 
 
-def test_format_report_yellow_medium_relevance():
-    results = [_make_result("Medium news", 6)]
+def test_format_report_yellow_for_seven():
+    results = [_make_result("Medium news", 7)]
     report = format_report(results, total_analyzed=1)
     assert "🟡" in report
-    assert "[6/10]" in report
+    assert "[7/10]" in report
 
 
-def test_format_report_ignored_shown_as_oneliner():
-    results = [_make_result("Boring benchmark", 3)]
-    report = format_report(results, total_analyzed=1)
-    assert "⚪" in report
-    assert "Ignorados" in report
-    assert "Boring benchmark" in report
-    assert "Impact 1" not in report  # no detailed analysis for ignored
+def test_format_report_below_cut_is_only_counted():
+    results = [_make_result("Boring benchmark", 3), _make_result("Meh news", 6)]
+    report = format_report(results, total_analyzed=2)
+    assert "Abaixo de 7/10: 2" in report
+    assert "Boring benchmark" not in report
+    assert "Meh news" not in report
+    assert "Ignorados" not in report
+
+
+def test_format_report_says_so_when_nothing_relevant():
+    report = format_report([_make_result("Meh", 5)], total_analyzed=1)
+    assert "Nada acima de 7/10 hoje" in report
+    assert "Destaques: 0" in report
+
+
+def test_format_report_no_empty_notice_when_there_are_highlights():
+    report = format_report([_make_result("Big", 9)], total_analyzed=1)
+    assert "Nada acima" not in report
 
 
 def test_format_report_mixed():
@@ -57,7 +68,60 @@ def test_format_report_mixed():
     report = format_report(results, total_analyzed=3)
     assert "🔴" in report
     assert "🟡" in report
-    assert "⚪" in report
+    assert "Low news" not in report
+    assert "Destaques: 2 | Abaixo de 7/10: 1" in report
+
+
+def test_format_report_title_links_to_article():
+    r = _make_result("Linked news", 8)
+    r.url = "https://example.com/a?x=1&y=2"
+    report = format_report([r], total_analyzed=1)
+    assert '<a href="https://example.com/a?x=1&amp;y=2">Linked news</a>' in report
+
+
+def test_format_report_title_without_url_is_plain_text():
+    r = _make_result("No link", 8)
+    r.url = ""
+    report = format_report([r], total_analyzed=1)
+    assert "<a " not in report
+    assert "No link" in report
+
+
+def test_format_report_caps_highlights_and_lists_overflow_compactly():
+    results = [_make_result(f"News {i}", 9 if i < 3 else 7) for i in range(8)]
+    report = format_report(results, total_analyzed=8)
+    assert "Destaques: 5" in report
+    assert report.count("Por que importa") == 5
+    assert "Também relevantes (3)" in report
+    assert report.count("Impact 1") == 5  # itens compactos não têm análise completa
+
+
+def test_format_report_highlights_are_highest_scores_first():
+    results = [_make_result("Low7", 7), _make_result("Top10", 10), _make_result("Mid8", 8)]
+    report = format_report(results, total_analyzed=3)
+    assert report.index("Top10") < report.index("Mid8") < report.index("Low7")
+
+
+def test_format_report_overflow_list_is_capped():
+    results = [_make_result(f"News {i}", 8) for i in range(20)]
+    report = format_report(results, total_analyzed=20)
+    assert "Também relevantes (15)" in report
+    assert "… e mais 5" in report
+
+
+def test_format_report_thresholds_from_env():
+    results = [_make_result("Six", 6), _make_result("Nine", 9), _make_result("Eight", 8)]
+    env = {"REPORT_MIN_RELEVANCE": "6", "REPORT_MAX_HIGHLIGHTS": "1"}
+    with patch.dict("os.environ", env):
+        report = format_report(results, total_analyzed=3)
+    assert "Destaques: 1 | Abaixo de 6/10: 0" in report
+    assert "Também relevantes (2)" in report
+
+
+def test_format_report_invalid_env_falls_back_to_default():
+    with patch.dict("os.environ", {"REPORT_MIN_RELEVANCE": "alto"}):
+        report = format_report([_make_result("Six", 6)], total_analyzed=1)
+    assert "Abaixo de 7/10: 1" in report
 
 
 def test_split_messages_under_limit():
@@ -102,6 +166,7 @@ def test_send_report_uses_html_parse_mode():
 
     payload = mock_post.call_args[1]["json"]
     assert payload["parse_mode"] == "HTML"
+    assert payload["link_preview_options"] == {"is_disabled": True}
     assert "*" not in payload["text"]  # no raw Markdown bold in output
 
 
