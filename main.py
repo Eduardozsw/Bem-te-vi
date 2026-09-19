@@ -46,7 +46,7 @@ def main() -> None:
         if profile:
             logger.info("Loaded user profile with %d top-level keys", len(profile))
 
-        results = analyze(deduped, profile=profile)
+        results = analyze(deduped, profile=profile, status=status)
         logger.info("Analysis complete. Sending report...")
 
         delivered = send_report(

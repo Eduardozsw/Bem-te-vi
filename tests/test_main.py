@@ -36,6 +36,7 @@ def test_main_orchestrates_pipeline_with_dedup():
     mock_dedup.assert_called_once()
     mock_analyze.assert_called_once()
     assert mock_analyze.call_args.args[0] == deduped
+    assert mock_analyze.call_args.kwargs["status"] is not None
     mock_send.assert_called_once()
     assert mock_send.call_args.kwargs["total_analyzed"] == 1
 

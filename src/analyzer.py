@@ -4,6 +4,7 @@ import yaml
 
 from src.llm import complete
 from src.models import Article, AnalysisResult
+from src.run_status import RunStatus
 
 logger = logging.getLogger(__name__)
 
@@ -112,15 +113,21 @@ def _parse_response(text: str, batch: list[Article]) -> list[AnalysisResult]:
     return results
 
 
-def analyze(articles: list[Article], profile: dict | None = None) -> list[AnalysisResult]:
+def analyze(
+    articles: list[Article],
+    profile: dict | None = None,
+    status: RunStatus | None = None,
+) -> list[AnalysisResult]:
     if not articles:
         return []
 
     system_prompt = _system_prompt(profile or {})
     batches = _build_batches(articles, batch_size=10)
     all_results: list[AnalysisResult] = []
+    failed_batches = 0
+    lost_articles = 0
 
-    for batch in batches:
+    for i, batch in enumerate(batches, start=1):
         payload = [
             {"title": a.title, "source": a.source, "content": a.content[:2000]}
             for a in batch
@@ -134,6 +141,17 @@ def analyze(articles: list[Article], profile: dict | None = None) -> list[Analys
             results = _parse_response(text, batch)
             all_results.extend(results)
         except Exception as e:
-            logger.error("Analyzer batch failed: %s", e)
+            failed_batches += 1
+            lost_articles += len(batch)
+            logger.error("Analyzer batch %d/%d failed: %s", i, len(batches), e)
+
+    if status is not None:
+        status.batches_total += len(batches)
+        status.batches_failed += failed_batches
+        if failed_batches:
+            status.add(
+                f"Análise: {failed_batches} de {len(batches)} lotes falharam "
+                f"({lost_articles} artigos não analisados)"
+            )
 
     return all_results
