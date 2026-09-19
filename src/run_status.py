@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 @dataclass
 class RunStatus:
     warnings: list[str] = field(default_factory=list)
+    articles_collected: int = 0
+    articles_after_dedup: int = 0
     batches_total: int = 0
     batches_failed: int = 0
     prompt_tokens: int = 0
