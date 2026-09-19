@@ -67,3 +67,54 @@ def test_complete_raises_value_error_when_content_is_none():
         import pytest
         with pytest.raises(ValueError, match="LLM returned empty content"):
             complete("sys", "usr")
+
+
+def test_complete_passes_default_retries_and_timeout():
+    from src.llm import DEFAULT_NUM_RETRIES, DEFAULT_TIMEOUT
+    with patch.dict(os.environ, {}, clear=True), \
+         patch("litellm.completion", return_value=_mock_completion()) as mock_c:
+        complete("sys", "usr")
+    kwargs = mock_c.call_args.kwargs
+    assert kwargs["num_retries"] == DEFAULT_NUM_RETRIES
+    assert kwargs["timeout"] == DEFAULT_TIMEOUT
+
+
+def test_complete_honors_retry_and_timeout_env():
+    env = {"LLM_NUM_RETRIES": "5", "LLM_TIMEOUT": "12.5"}
+    with patch.dict(os.environ, env, clear=True), \
+         patch("litellm.completion", return_value=_mock_completion()) as mock_c:
+        complete("sys", "usr")
+    kwargs = mock_c.call_args.kwargs
+    assert kwargs["num_retries"] == 5
+    assert kwargs["timeout"] == 12.5
+
+
+def _mock_with_usage(prompt=100, completion=20):
+    resp = _mock_completion()
+    resp.usage = MagicMock(prompt_tokens=prompt, completion_tokens=completion)
+    return resp
+
+
+def test_complete_records_usage_and_cost_in_status():
+    from src.run_status import RunStatus
+    status = RunStatus()
+    with patch.dict(os.environ, {}, clear=True), \
+         patch("litellm.completion", return_value=_mock_with_usage(100, 20)), \
+         patch("litellm.completion_cost", return_value=0.0015):
+        complete("sys", "usr", status=status)
+        complete("sys", "usr", status=status)
+    assert status.prompt_tokens == 200
+    assert status.completion_tokens == 40
+    assert status.total_cost_usd == 0.003
+
+
+def test_complete_marks_cost_unknown_when_pricing_fails():
+    from src.run_status import RunStatus
+    status = RunStatus()
+    with patch.dict(os.environ, {}, clear=True), \
+         patch("litellm.completion", return_value=_mock_with_usage(10, 5)), \
+         patch("litellm.completion_cost", side_effect=Exception("model not mapped")):
+        assert complete("sys", "usr", status=status) == "resposta"
+    assert status.prompt_tokens == 10
+    assert status.cost_unknown is True
+    assert status.total_cost_usd is None

@@ -137,6 +137,7 @@ def analyze(
                 system_prompt,
                 json.dumps(payload, ensure_ascii=False),
                 max_tokens=4096,
+                status=status,
             )
             results = _parse_response(text, batch)
             all_results.extend(results)
