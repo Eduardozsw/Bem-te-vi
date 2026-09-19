@@ -2,12 +2,21 @@ name: Daily News Intelligence
 
 on:
   schedule:
-    - cron: "0 10 * * *"  # 10h UTC = 7h BRT
+    - cron: "17 10 * * *"  # 10h17 UTC = 7h17 BRT (fora do minuto :00, que o GitHub atrasa/descarta sob carga)
   workflow_dispatch:       # manual trigger for testing
+
+permissions:
+  contents: write  # push do histórico de execuções (runs.db) na branch `data`
+
+concurrency:
+  group: daily-pipeline
+  cancel-in-progress: false
 
 jobs:
   run-pipeline:
     runs-on: ubuntu-latest
+    env:
+      RUNS_DB: data/runs.db
 
     steps:
       - name: Checkout repository
@@ -22,12 +31,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Reconstruct Gmail auth files
-        env:
-          GMAIL_TOKEN_JSON: ${{ secrets.GMAIL_TOKEN_JSON }}
-          GMAIL_CREDENTIALS_JSON: ${{ secrets.GMAIL_CREDENTIALS_JSON }}
+      - name: Restore run history from `data` branch
         run: |
-          echo "$GMAIL_CREDENTIALS_JSON" > credentials.json
+          mkdir -p data
+          if git fetch --depth=1 origin data; then
+            git show FETCH_HEAD:runs.db > "$RUNS_DB"
+            echo "Restored run history ($(stat -c %s "$RUNS_DB") bytes)"
+          else
+            echo "No data branch yet — starting a new run history"
+          fi
 
       - name: Run pipeline
         env:
@@ -39,3 +51,30 @@ jobs:
           GMAIL_LABEL: newsletters
           USER_PROFILE: ${{ secrets.USER_PROFILE }}
         run: python main.py
+
+      # Roda mesmo se o pipeline falhar: execuções com falha também entram no histórico.
+      - name: Save run history to `data` branch
+        if: always()
+        run: |
+          [ -f "$RUNS_DB" ] || { echo "No runs.db produced"; exit 0; }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git fetch --depth=1 origin data; then
+            git worktree add ../history FETCH_HEAD
+            git -C ../history switch -c data
+          else
+            git worktree add --orphan -b data ../history
+          fi
+          cp "$RUNS_DB" ../history/runs.db
+          git -C ../history add runs.db
+          git -C ../history commit -m "runs: ${{ github.run_id }} ($(date -u +%F))"
+          git -C ../history push origin data
+
+      - name: Upload run history artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: runs-db-${{ github.run_id }}
+          path: data/runs.db
+          if-no-files-found: ignore
+          retention-days: 90
