@@ -14,3 +14,6 @@ venv/
 docs/superpowers/
 
 profile.yaml
+
+# SQLite run log (local); on Actions it lives in the `data` branch
+data/

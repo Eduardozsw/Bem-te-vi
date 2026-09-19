@@ -6,6 +6,7 @@ O bem-te-vi é um passarinho brasileiro cujo nome quer dizer literalmente *"bem 
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
+[![CI](https://github.com/Eduardozsw/Bem-te-vi/actions/workflows/ci.yml/badge.svg)](https://github.com/Eduardozsw/Bem-te-vi/actions/workflows/ci.yml)
 
 ## ✨ Funcionalidades
 
@@ -14,7 +15,9 @@ O bem-te-vi é um passarinho brasileiro cujo nome quer dizer literalmente *"bem 
 - 🔗 Deduplicação semântica (a mesma notícia de várias fontes vira um item só)
 - 📱 Relatório diário formatado no Telegram
 - ☁️ Roda de graça no GitHub Actions (agendado)
-- 🔌 IA na **nuvem** (Anthropic) ou **local** (Ollama e afins) — sua escolha
+- 🔌 IA na **nuvem** (OpenAI, Anthropic, OpenRouter…) ou **local** (Ollama e afins) — sua escolha
+- 🔁 Retries com backoff e timeout nas chamadas de IA; falhas parciais aparecem no relatório
+- 📊 Registro de cada execução em SQLite (status, volumes, lotes com falha, tokens, custo)
 - 👤 Perfil opcional: marca **qual projeto/ativo seu** cada notícia afeta
 
 ## 🔍 Como funciona
@@ -23,13 +26,14 @@ O bem-te-vi é um passarinho brasileiro cujo nome quer dizer literalmente *"bem 
 Gmail + RSS  →  deduplicação  →  análise (IA)  →  relatório no Telegram
 ```
 
-Cada execução é independente (stateless) — sem banco de dados, sem estado entre rodadas.
+O processamento de notícias não guarda estado entre rodadas. O único estado persistido é o
+registro de execuções (`runs`), usado para monitoramento — veja [📊 Monitoramento](#-monitoramento).
 
 ## 🚀 Início rápido
 
 ```bash
-git clone https://github.com/Eduardozsw/news-intelligence-assistant.git
-cd news-intelligence-assistant
+git clone https://github.com/Eduardozsw/Bem-te-vi.git
+cd Bem-te-vi
 pip install -r requirements.txt
 cp .env.example .env   # preencha suas chaves
 python main.py
@@ -46,6 +50,9 @@ python main.py
 | `LLM_API_KEY` | se usar nuvem | Chave do provedor de IA (OpenAI, Anthropic, OpenRouter…) |
 | `LLM_API_BASE` | só local | Endpoint do provedor local (ex: `http://localhost:11434`) |
 | `USER_PROFILE` | não | Perfil em YAML (uso como secret no Actions; local use `profile.yaml`) |
+| `LLM_NUM_RETRIES` | não | Tentativas extras em erros transitórios da IA (default: `3`) |
+| `LLM_TIMEOUT` | não | Timeout por chamada à IA, em segundos (default: `60`) |
+| `RUNS_DB` | não | Caminho do SQLite com o registro de execuções (default: `data/runs.db`) |
 
 ## 🧠 Escolha do modelo
 
@@ -155,13 +162,61 @@ Escolha o modelo conforme sua máquina:
 
 ## 🤖 Rodando no GitHub Actions
 
-O workflow `.github/workflows/daily.yml` roda diariamente. Configure os *secrets* do repositório:
+O workflow `.github/workflows/daily.yml` roda diariamente (10h17 UTC). Configure os *secrets* do repositório:
 
 - `LLM_API_KEY` (chave do seu provedor de IA — OpenAI, Anthropic…)
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
 - `GMAIL_TOKEN_JSON` (conteúdo do `token.json` gerado localmente)
 - `USER_PROFILE` (opcional — conteúdo do seu `profile.yaml` para análise personalizada)
+
+O `credentials.json` **não** é necessário no Actions: o `token.json` já carrega o client id/secret
+usados para renovar o acesso. Se você configurou um secret `GMAIL_CREDENTIALS_JSON` em versões
+antigas, pode apagá-lo.
+
+> ⚠️ Em repositórios públicos, o GitHub **desativa workflows agendados após 60 dias sem atividade**
+> no repositório. Se o relatório parar de chegar, veja a aba *Actions* e reative o workflow
+> (`gh workflow enable daily.yml`).
+
+O workflow `.github/workflows/ci.yml` roda os testes em todo push e pull request (sem secrets —
+todas as chamadas externas são mockadas).
+
+## 📊 Monitoramento
+
+**No relatório:** falhas parciais (feed fora do ar, deduplicação que falhou, lote de análise que
+falhou) aparecem no rodapé ⚠️ da mensagem — ex.: `Análise: 1 de 3 lotes falharam (10 artigos não
+analisados)`. Um crash do pipeline dispara um alerta 🚨 no Telegram e encerra com código 1.
+
+**Registro de execuções:** cada execução grava uma linha na tabela `runs` de um SQLite
+(schema escrito à mão em [`sql/schema.sql`](sql/schema.sql)):
+
+| Coluna | Conteúdo |
+|---|---|
+| `started_at` / `finished_at` | início e fim (UTC, ISO 8601) |
+| `status` | `success`, `partial` (houve avisos ou lotes com falha) ou `failed` (crash ou entrega falhou) |
+| `articles_collected` / `articles_after_dedup` | volume antes e depois da deduplicação |
+| `batches_total` / `batches_failed` | lotes enviados à IA e quantos falharam |
+| `prompt_tokens` / `completion_tokens` / `cost_usd` | uso e custo estimado pelo LiteLLM |
+| `model`, `warnings` (JSON), `error` | contexto para diagnóstico |
+
+No Actions, o `runs.db` é versionado na branch **`data`** (um commit por execução) e também sobe
+como artefato da execução. Para ver as métricas:
+
+```bash
+git fetch origin data && git show origin/data:runs.db > runs.db
+sqlite3 runs.db < sql/queries.sql
+```
+
+[`sql/queries.sql`](sql/queries.sql) traz N de execuções, taxa de sucesso, % de lotes com falha,
+redução da deduplicação, custo e duração média.
+
+**Limitações conhecidas:**
+- O retry é feito pelo LiteLLM (`num_retries`) e só cobre erros transitórios (timeout, conexão,
+  5xx, rate limit). Os testes verificam que os parâmetros são passados, não o comportamento
+  interno do LiteLLM.
+- `cost_usd` é uma estimativa pela tabela de preços do LiteLLM; fica `NULL` quando o modelo não
+  tem preço conhecido (ex.: modelos locais) — nunca é gravado como 0.
+- O histórico começa na primeira execução com esta versão; rodadas anteriores não foram registradas.
 
 ## 🤝 Contribuindo
 

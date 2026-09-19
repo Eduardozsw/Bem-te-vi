@@ -56,6 +56,7 @@ def deduplicate(articles: list[Article], status: RunStatus | None = None) -> lis
             DEDUP_PROMPT,
             json.dumps(payload, ensure_ascii=False),
             max_tokens=2048,
+            status=status,
         )
         groups = _parse_groups(text, len(articles))
     except Exception as e:

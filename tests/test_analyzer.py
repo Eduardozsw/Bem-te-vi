@@ -122,7 +122,7 @@ def test_empty_profile_leaves_prompt_unchanged_and_affects_empty():
     ])
     captured = {}
 
-    def fake_complete(system, user, max_tokens=4096):
+    def fake_complete(system, user, max_tokens=4096, **kwargs):
         captured["system"] = system
         return payload
 
@@ -141,7 +141,7 @@ def test_profile_is_injected_into_system_prompt():
     ])
     captured = {}
 
-    def fake_complete(system, user, max_tokens=4096):
+    def fake_complete(system, user, max_tokens=4096, **kwargs):
         captured["system"] = system
         return payload
 
@@ -172,7 +172,7 @@ def test_profile_adds_affects_to_schema():
     ])
     captured = {}
 
-    def fake_complete(system, user, max_tokens=4096):
+    def fake_complete(system, user, max_tokens=4096, **kwargs):
         captured["system"] = system
         return payload
 
@@ -185,3 +185,42 @@ def test_profile_adds_affects_to_schema():
     # affects must be in the JSON schema example, before the profile context block
     assert system.index('"affects"') < system.index("USER PROFILE")
     assert results[0].affects == ["Bem-te-vi"]
+
+
+def _ok_payload(titles):
+    return json.dumps([
+        {"title": t, "relevance": 7, "summary": "s",
+         "why_it_matters": "w", "impacts": [], "actions": []}
+        for t in titles
+    ])
+
+
+def test_analyze_reports_failed_batches_in_status():
+    from src.run_status import RunStatus
+    articles = [_make_article(f"Article {i}") for i in range(15)]  # 2 lotes: 10 + 5
+    ok = _ok_payload([f"Article {i}" for i in range(10)])
+    status = RunStatus()
+    with patch("src.analyzer.complete", side_effect=[ok, Exception("timeout")]):
+        results = analyze(articles, status=status)
+
+    assert len(results) == 10  # lote bom preservado
+    assert status.batches_total == 2
+    assert status.batches_failed == 1
+    assert status.warnings == ["Análise: 1 de 2 lotes falharam (5 artigos não analisados)"]
+
+
+def test_analyze_no_warning_when_all_batches_succeed():
+    from src.run_status import RunStatus
+    articles = [_make_article("Only")]
+    status = RunStatus()
+    with patch("src.analyzer.complete", return_value=_ok_payload(["Only"])):
+        analyze(articles, status=status)
+    assert status.batches_total == 1
+    assert status.batches_failed == 0
+    assert status.warnings == []
+
+
+def test_analyze_failure_without_status_does_not_raise():
+    articles = [_make_article("Only")]
+    with patch("src.analyzer.complete", side_effect=Exception("boom")):
+        assert analyze(articles, status=None) == []
