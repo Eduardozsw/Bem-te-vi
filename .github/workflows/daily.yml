@@ -2,7 +2,7 @@ name: Daily News Intelligence
 
 on:
   schedule:
-    - cron: "0 10 * * *"  # 10h UTC = 7h BRT
+    - cron: "17 10 * * *"  # 10h17 UTC = 7h17 BRT (fora do minuto :00, que o GitHub atrasa/descarta sob carga)
   workflow_dispatch:       # manual trigger for testing
 
 permissions:

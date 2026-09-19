@@ -162,7 +162,7 @@ Escolha o modelo conforme sua máquina:
 
 ## 🤖 Rodando no GitHub Actions
 
-O workflow `.github/workflows/daily.yml` roda diariamente. Configure os *secrets* do repositório:
+O workflow `.github/workflows/daily.yml` roda diariamente (10h17 UTC). Configure os *secrets* do repositório:
 
 - `LLM_API_KEY` (chave do seu provedor de IA — OpenAI, Anthropic…)
 - `TELEGRAM_BOT_TOKEN`
@@ -173,6 +173,10 @@ O workflow `.github/workflows/daily.yml` roda diariamente. Configure os *secrets
 O `credentials.json` **não** é necessário no Actions: o `token.json` já carrega o client id/secret
 usados para renovar o acesso. Se você configurou um secret `GMAIL_CREDENTIALS_JSON` em versões
 antigas, pode apagá-lo.
+
+> ⚠️ Em repositórios públicos, o GitHub **desativa workflows agendados após 60 dias sem atividade**
+> no repositório. Se o relatório parar de chegar, veja a aba *Actions* e reative o workflow
+> (`gh workflow enable daily.yml`).
 
 O workflow `.github/workflows/ci.yml` roda os testes em todo push e pull request (sem secrets —
 todas as chamadas externas são mockadas).
