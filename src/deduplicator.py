@@ -2,6 +2,7 @@ import json
 import logging
 
 from src.llm import complete
+from src.llm_json import extract_json_list
 from src.models import Article
 from src.run_status import RunStatus
 
@@ -18,40 +19,12 @@ def _no_dedup(articles: list[Article]) -> list[Article]:
     return articles
 
 
-def _load_groups(text: str) -> list:
-    """Extrai a lista de grupos da resposta do modelo, tolerando texto em volta.
-
-    Aceita o formato pedido (`[[0, 3], [1]]`) seguido de lixo, e também grupos soltos sem o
-    colchete externo (`[0, 3], [1]`) — os dois quebravam `json.loads` com "Extra data".
-    """
-    decoder = json.JSONDecoder()
-    start = text.find("[")
-    if start == -1:
-        raise ValueError("no JSON array in dedup response")
-    data, pos = decoder.raw_decode(text, start)
-    if all(isinstance(g, list) for g in data):
-        return data
-
-    groups = [data]  # grupos soltos: continua lendo `, [..]` enquanto houver
-    while True:
-        rest = text[pos:].lstrip().removeprefix(",").lstrip()
-        if not rest.startswith("["):
-            return groups
-        group, end = decoder.raw_decode(rest)
-        if not isinstance(group, list):
-            return groups
-        groups.append(group)
-        pos = len(text) - len(rest) + end
-
-
 def _parse_groups(text: str, n: int) -> list[list[int]]:
-    data = _load_groups(text)
+    data = extract_json_list(text, list)
 
     seen: set[int] = set()
     groups: list[list[int]] = []
     for group in data:
-        if not isinstance(group, list):
-            continue
         valid = [i for i in group if isinstance(i, int) and 0 <= i < n and i not in seen]
         seen.update(valid)
         if valid:

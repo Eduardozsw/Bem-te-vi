@@ -3,6 +3,7 @@ import logging
 import yaml
 
 from src.llm import complete
+from src.llm_json import extract_json_list
 from src.models import Article, AnalysisResult
 from src.run_status import RunStatus
 
@@ -76,14 +77,7 @@ def _build_batches(articles: list[Article], batch_size: int = 10) -> list[list[A
 
 
 def _parse_response(text: str, batch: list[Article]) -> list[AnalysisResult]:
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
-        start = text.find("[")
-        end = text.rfind("]") + 1
-        if start == -1 or end == 0:
-            raise
-        data = json.loads(text[start:end])
+    data = extract_json_list(text, dict)
 
     if len(data) != len(batch):
         logger.warning(
@@ -132,6 +126,7 @@ def analyze(
             {"title": a.title, "source": a.source, "content": a.content[:2000]}
             for a in batch
         ]
+        text = ""
         try:
             text = complete(
                 system_prompt,
@@ -144,7 +139,10 @@ def analyze(
         except Exception as e:
             failed_batches += 1
             lost_articles += len(batch)
-            logger.error("Analyzer batch %d/%d failed: %s", i, len(batches), e)
+            logger.error(
+                "Analyzer batch %d/%d failed: %s (response start: %r)",
+                i, len(batches), e, text[:300],
+            )
 
     if status is not None:
         status.batches_total += len(batches)

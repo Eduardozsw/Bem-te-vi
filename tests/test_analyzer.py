@@ -224,3 +224,28 @@ def test_analyze_failure_without_status_does_not_raise():
     articles = [_make_article("Only")]
     with patch("src.analyzer.complete", side_effect=Exception("boom")):
         assert analyze(articles, status=None) == []
+
+
+def test_analyze_ignores_text_after_the_json():
+    from src.run_status import RunStatus
+    articles = [_make_article("A"), _make_article("B")]
+    response = _ok_payload(["A", "B"]) + "\n\nNote: [B] is less relevant."
+    status = RunStatus()
+    with patch("src.analyzer.complete", return_value=response):
+        results = analyze(articles, status=status)
+
+    assert [r.title for r in results] == ["A", "B"]
+    assert status.batches_failed == 0
+
+
+def test_analyze_truncated_response_keeps_complete_items():
+    from src.run_status import RunStatus
+    articles = [_make_article(t) for t in "ABC"]
+    full = _ok_payload(["A", "B", "C"])
+    truncated = full[: full.index('"C"') + 5]  # cortado no meio do 3º objeto
+    status = RunStatus()
+    with patch("src.analyzer.complete", return_value=truncated):
+        results = analyze(articles, status=status)
+
+    assert [r.title for r in results] == ["A", "B"]
+    assert status.batches_failed == 0
