@@ -8,9 +8,9 @@ def test_runstatus_starts_empty():
 
 def test_runstatus_add_appends():
     status = RunStatus()
-    status.add("Gmail: label não encontrada")
+    status.add("RSS: config.yaml não encontrado")
     status.add("RSS fora do ar")
-    assert status.warnings == ["Gmail: label não encontrada", "RSS fora do ar"]
+    assert status.warnings == ["RSS: config.yaml não encontrado", "RSS fora do ar"]
 
 
 def test_record_usage_accumulates_tokens_and_cost():

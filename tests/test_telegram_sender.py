@@ -204,9 +204,9 @@ def test_format_report_escapes_html_special_chars():
 
 def test_format_report_with_warnings_shows_footer():
     result = _make_result("News", 8)
-    report = format_report([result], total_analyzed=1, warnings=["Gmail: label não encontrada"])
+    report = format_report([result], total_analyzed=1, warnings=["RSS: config.yaml não encontrado"])
     assert "Avisos" in report
-    assert "Gmail: label não encontrada" in report
+    assert "RSS: config.yaml não encontrado" in report
 
 
 def test_format_report_without_warnings_no_footer():

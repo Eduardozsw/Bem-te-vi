@@ -24,6 +24,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # Todas as chamadas externas (LLM, Gmail, Telegram) são mockadas: sem secrets, sem custo.
+      # Todas as chamadas externas (LLM, RSS, Telegram) são mockadas: sem secrets, sem custo.
       - name: Run tests
         run: python -m pytest -q

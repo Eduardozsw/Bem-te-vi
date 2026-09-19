@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 
 from src.analyzer import analyze
 from src.deduplicator import deduplicate
-from src.gmail_reader import read_gmail
 from src.llm import current_model
 from src.profile import load_profile
 from src.rss_reader import read_rss_feeds
@@ -33,17 +32,10 @@ def main() -> None:
     delivered = False
     error: str | None = None
     try:
-        label = os.getenv("GMAIL_LABEL", "newsletters")
-
-        logger.info("Fetching Gmail newsletters (label: %s)...", label)
-        gmail_articles = read_gmail(label, status=status)
-        logger.info("Found %d Gmail articles", len(gmail_articles))
-
         logger.info("Fetching RSS feeds...")
-        rss_articles = read_rss_feeds("config.yaml", status=status)
-        logger.info("Found %d RSS articles", len(rss_articles))
+        all_articles = read_rss_feeds("config.yaml", status=status)
+        logger.info("Found %d RSS articles", len(all_articles))
 
-        all_articles = gmail_articles + rss_articles
         status.articles_collected = len(all_articles)
         if not all_articles:
             status.add("Nenhum conteúdo encontrado nas últimas 24h")
