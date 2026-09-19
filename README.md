@@ -12,7 +12,7 @@ O bem-te-vi é um passarinho brasileiro cujo nome quer dizer literalmente *"bem 
 - 📥 Coleta de newsletters do Gmail (por marcador) + feeds RSS
 - 🧠 Análise e pontuação de relevância com IA
 - 🔗 Deduplicação semântica (a mesma notícia de várias fontes vira um item só)
-- 📱 Relatório diário formatado no Telegram
+- 📱 Relatório diário enxuto no Telegram: só os melhores itens, com link para a fonte
 - ☁️ Roda de graça no GitHub Actions (agendado)
 - 🔌 IA na **nuvem** (Anthropic) ou **local** (Ollama e afins) — sua escolha
 - 👤 Perfil opcional: marca **qual projeto/ativo seu** cada notícia afeta
@@ -46,6 +46,18 @@ python main.py
 | `LLM_API_KEY` | se usar nuvem | Chave do provedor de IA (OpenAI, Anthropic, OpenRouter…) |
 | `LLM_API_BASE` | só local | Endpoint do provedor local (ex: `http://localhost:11434`) |
 | `USER_PROFILE` | não | Perfil em YAML (uso como secret no Actions; local use `profile.yaml`) |
+| `REPORT_MIN_RELEVANCE` | não | Nota mínima (0–10) para um item entrar no relatório (default: `7`) |
+| `REPORT_MAX_HIGHLIGHTS` | não | Quantos itens aparecem com análise completa (default: `5`) |
+
+## 📱 O relatório
+
+- Os itens com nota ≥ `REPORT_MIN_RELEVANCE` são ordenados pela nota. Os `REPORT_MAX_HIGHLIGHTS`
+  primeiros saem com a análise completa (resumo, por que importa, impactos, ações).
+- Os demais itens relevantes aparecem em **➕ Também relevantes**, uma linha cada (até 10).
+- O que ficou abaixo do corte só é **contado** no cabeçalho, sem lista.
+- Todo título é um link: o artigo, para RSS; a mensagem no Gmail, para newsletters (abre na
+  primeira conta logada no navegador, `u/0`).
+- Em dia sem nada relevante, o relatório diz isso numa linha em vez de encher a mensagem.
 
 ## 🧠 Escolha do modelo
 

@@ -15,6 +15,8 @@ from src.run_status import RunStatus
 logger = logging.getLogger(__name__)
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+# Abre a mensagem na primeira conta logada no navegador (u/0).
+GMAIL_MESSAGE_URL = "https://mail.google.com/mail/u/0/#all/{id}"
 
 
 def _build_service():
@@ -135,7 +137,7 @@ def read_gmail(label: str = "newsletters", status: RunStatus | None = None) -> l
                     source=sender,
                     title=subject,
                     content=body[:5000],
-                    url="",
+                    url=GMAIL_MESSAGE_URL.format(id=msg["id"]),
                     published_at=published_at,
                 )
             )
