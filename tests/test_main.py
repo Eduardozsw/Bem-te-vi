@@ -27,13 +27,11 @@ def _make_result(title: str, relevance: int) -> AnalysisResult:
 
 
 def test_main_orchestrates_pipeline_with_dedup():
-    gmail_articles = [_make_article("Gmail Article")]
-    rss_articles = [_make_article("RSS Article")]
+    rss_articles = [_make_article("RSS Article A"), _make_article("RSS Article B")]
     deduped = [_make_article("Merged Article")]
     analysis_results = [_make_result("Merged Article", 8)]
 
-    with patch("main.read_gmail", return_value=gmail_articles), \
-         patch("main.read_rss_feeds", return_value=rss_articles), \
+    with patch("main.read_rss_feeds", return_value=rss_articles), \
          patch("main.deduplicate", return_value=deduped) as mock_dedup, \
          patch("main.analyze", return_value=analysis_results) as mock_analyze, \
          patch("main.send_report", return_value=True) as mock_send:
@@ -49,8 +47,7 @@ def test_main_orchestrates_pipeline_with_dedup():
 
 
 def test_main_handles_empty_sources():
-    with patch("main.read_gmail", return_value=[]), \
-         patch("main.read_rss_feeds", return_value=[]), \
+    with patch("main.read_rss_feeds", return_value=[]), \
          patch("main.deduplicate", return_value=[]), \
          patch("main.analyze", return_value=[]) as mock_analyze, \
          patch("main.send_report", return_value=True) as mock_send:
@@ -63,7 +60,7 @@ def test_main_handles_empty_sources():
 
 
 def test_main_alerts_and_exits_on_crash():
-    with patch("main.read_gmail", side_effect=Exception("boom")), \
+    with patch("main.read_rss_feeds", side_effect=Exception("boom")), \
          patch("main.send_alert") as mock_alert:
         import main
         with pytest.raises(SystemExit) as exc:
@@ -74,8 +71,7 @@ def test_main_alerts_and_exits_on_crash():
 
 
 def test_main_exits_when_delivery_fails():
-    with patch("main.read_gmail", return_value=[]), \
-         patch("main.read_rss_feeds", return_value=[]), \
+    with patch("main.read_rss_feeds", return_value=[]), \
          patch("main.deduplicate", return_value=[]), \
          patch("main.analyze", return_value=[]), \
          patch("main.send_report", return_value=False):
@@ -89,8 +85,7 @@ def test_main_exits_when_delivery_fails():
 def test_main_loads_profile_and_passes_to_analyze():
     from unittest.mock import patch, MagicMock
     import main as main_module
-    with patch.object(main_module, "read_gmail", return_value=[]), \
-         patch.object(main_module, "read_rss_feeds", return_value=[]), \
+    with patch.object(main_module, "read_rss_feeds", return_value=[]), \
          patch.object(main_module, "deduplicate", return_value=[]), \
          patch.object(main_module, "send_report", return_value=True), \
          patch.object(main_module, "load_profile", return_value={"projetos": {"X": {}}}) as lp, \
@@ -107,8 +102,7 @@ def _run_status_recorded(mock_record_run):
 
 
 def test_main_records_success_run(mock_record_run):
-    with patch("main.read_gmail", return_value=[_make_article("A")]), \
-         patch("main.read_rss_feeds", return_value=[_make_article("B")]), \
+    with patch("main.read_rss_feeds", return_value=[_make_article("A"), _make_article("B")]), \
          patch("main.deduplicate", return_value=[_make_article("A")]), \
          patch("main.load_profile", return_value={}), \
          patch("main.analyze", return_value=[_make_result("A", 8)]), \
@@ -128,8 +122,7 @@ def test_main_records_partial_run_when_batches_fail(mock_record_run):
         status.add("Análise: 1 de 2 lotes falharam (5 artigos não analisados)")
         return []
 
-    with patch("main.read_gmail", return_value=[_make_article("A")]), \
-         patch("main.read_rss_feeds", return_value=[]), \
+    with patch("main.read_rss_feeds", return_value=[_make_article("A")]), \
          patch("main.deduplicate", return_value=[_make_article("A")]), \
          patch("main.load_profile", return_value={}), \
          patch("main.analyze", side_effect=failing_analyze), \
@@ -142,7 +135,7 @@ def test_main_records_partial_run_when_batches_fail(mock_record_run):
 
 
 def test_main_records_failed_run_on_crash(mock_record_run):
-    with patch("main.read_gmail", side_effect=RuntimeError("boom")), \
+    with patch("main.read_rss_feeds", side_effect=RuntimeError("boom")), \
          patch("main.send_alert"):
         import main
         with pytest.raises(SystemExit):
@@ -153,8 +146,7 @@ def test_main_records_failed_run_on_crash(mock_record_run):
 
 
 def test_main_records_failed_run_when_delivery_fails(mock_record_run):
-    with patch("main.read_gmail", return_value=[]), \
-         patch("main.read_rss_feeds", return_value=[]), \
+    with patch("main.read_rss_feeds", return_value=[]), \
          patch("main.deduplicate", return_value=[]), \
          patch("main.analyze", return_value=[]), \
          patch("main.send_report", return_value=False):

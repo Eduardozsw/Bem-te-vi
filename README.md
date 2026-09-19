@@ -1,6 +1,6 @@
 # 🐦 Bem-te-vi
 
-> Seu assistente de inteligência de notícias. Lê suas newsletters do Gmail e feeds RSS, analisa com IA, e te manda um resumo diário no Telegram.
+> Seu assistente de inteligência de notícias. Lê feeds RSS de tecnologia e mercado financeiro, analisa com IA, e te manda um resumo diário no Telegram.
 
 O bem-te-vi é um passarinho brasileiro cujo nome quer dizer literalmente *"bem te vi"* — e é isso que ele faz: vê as notícias por você e te conta o que importa.
 
@@ -10,7 +10,7 @@ O bem-te-vi é um passarinho brasileiro cujo nome quer dizer literalmente *"bem 
 
 ## ✨ Funcionalidades
 
-- 📥 Coleta de newsletters do Gmail (por marcador) + feeds RSS
+- 📥 Coleta de feeds RSS (tecnologia e mercado financeiro), configuráveis em `config.yaml`
 - 🧠 Análise e pontuação de relevância com IA
 - 🔗 Deduplicação semântica (a mesma notícia de várias fontes vira um item só)
 - 📱 Relatório diário enxuto no Telegram: só os melhores itens, com link para a fonte
@@ -23,7 +23,7 @@ O bem-te-vi é um passarinho brasileiro cujo nome quer dizer literalmente *"bem 
 ## 🔍 Como funciona
 
 ```
-Gmail + RSS  →  deduplicação  →  análise (IA)  →  relatório no Telegram
+RSS  →  deduplicação  →  análise (IA)  →  relatório no Telegram
 ```
 
 O processamento de notícias não guarda estado entre rodadas. O único estado persistido é o
@@ -45,7 +45,6 @@ python main.py
 |---|---|---|
 | `TELEGRAM_BOT_TOKEN` | sim | Token do bot (via @BotFather) |
 | `TELEGRAM_CHAT_ID` | sim | Seu chat id no Telegram |
-| `GMAIL_LABEL` | não | Marcador lido no Gmail (default: `newsletters`) |
 | `LLM_MODEL` | não | Modelo no formato LiteLLM (default: `gpt-4o-mini`) |
 | `LLM_API_KEY` | se usar nuvem | Chave do provedor de IA (OpenAI, Anthropic, OpenRouter…) |
 | `LLM_API_BASE` | só local | Endpoint do provedor local (ex: `http://localhost:11434`) |
@@ -62,8 +61,7 @@ python main.py
   primeiros saem com a análise completa (resumo, por que importa, impactos, ações).
 - Os demais itens relevantes aparecem em **➕ Também relevantes**, uma linha cada (até 10).
 - O que ficou abaixo do corte só é **contado** no cabeçalho, sem lista.
-- Todo título é um link: o artigo, para RSS; a mensagem no Gmail, para newsletters (abre na
-  primeira conta logada no navegador, `u/0`).
+- Todo título é um link para o artigo original.
 - Em dia sem nada relevante, o relatório diz isso numa linha em vez de encher a mensagem.
 
 ## 🧠 Escolha do modelo
@@ -154,18 +152,6 @@ Escolha o modelo conforme sua máquina:
 | GPU 12–16 GB | `ollama/qwen2.5:14b` | `http://localhost:11434` | melhor qualidade |
 | GPU 24 GB+ | `ollama/qwen2.5:32b` | `http://localhost:11434` | mais perto da nuvem |
 
-## 📧 Setup do Gmail
-
-1. No [Google Cloud Console](https://console.cloud.google.com/), crie um projeto e **ative a Gmail API**.
-2. Configure a tela de consentimento OAuth (tipo *External*, modo *Testing*) e adicione seu email como *test user*.
-3. Crie uma credencial *OAuth client ID* do tipo **Desktop app**, baixe o JSON e salve como `credentials.json` na raiz.
-4. No Gmail, crie o marcador `newsletters` e um filtro que aplique esse marcador às newsletters desejadas.
-5. Gere o token de acesso:
-   ```bash
-   python setup_gmail_auth.py
-   ```
-   Isso abre o navegador, você autoriza, e um `token.json` é criado. O app pede apenas acesso **somente leitura**.
-
 ## 💬 Setup do Telegram
 
 1. Fale com o [@BotFather](https://t.me/BotFather), mande `/newbot` e siga os passos → você recebe o `TELEGRAM_BOT_TOKEN`.
@@ -179,12 +165,7 @@ O workflow `.github/workflows/daily.yml` roda diariamente (10h17 UTC). Configure
 - `LLM_API_KEY` (chave do seu provedor de IA — OpenAI, Anthropic…)
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
-- `GMAIL_TOKEN_JSON` (conteúdo do `token.json` gerado localmente)
 - `USER_PROFILE` (opcional — conteúdo do seu `profile.yaml` para análise personalizada)
-
-O `credentials.json` **não** é necessário no Actions: o `token.json` já carrega o client id/secret
-usados para renovar o acesso. Se você configurou um secret `GMAIL_CREDENTIALS_JSON` em versões
-antigas, pode apagá-lo.
 
 > ⚠️ Em repositórios públicos, o GitHub **desativa workflows agendados após 60 dias sem atividade**
 > no repositório. Se o relatório parar de chegar, veja a aba *Actions* e reative o workflow

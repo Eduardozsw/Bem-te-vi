@@ -18,19 +18,40 @@ def _no_dedup(articles: list[Article]) -> list[Article]:
     return articles
 
 
+def _load_groups(text: str) -> list:
+    """Extrai a lista de grupos da resposta do modelo, tolerando texto em volta.
+
+    Aceita o formato pedido (`[[0, 3], [1]]`) seguido de lixo, e também grupos soltos sem o
+    colchete externo (`[0, 3], [1]`) — os dois quebravam `json.loads` com "Extra data".
+    """
+    decoder = json.JSONDecoder()
+    start = text.find("[")
+    if start == -1:
+        raise ValueError("no JSON array in dedup response")
+    data, pos = decoder.raw_decode(text, start)
+    if all(isinstance(g, list) for g in data):
+        return data
+
+    groups = [data]  # grupos soltos: continua lendo `, [..]` enquanto houver
+    while True:
+        rest = text[pos:].lstrip().removeprefix(",").lstrip()
+        if not rest.startswith("["):
+            return groups
+        group, end = decoder.raw_decode(rest)
+        if not isinstance(group, list):
+            return groups
+        groups.append(group)
+        pos = len(text) - len(rest) + end
+
+
 def _parse_groups(text: str, n: int) -> list[list[int]]:
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
-        start = text.find("[")
-        end = text.rfind("]") + 1
-        if start == -1 or end == 0:
-            raise
-        data = json.loads(text[start:end])
+    data = _load_groups(text)
 
     seen: set[int] = set()
     groups: list[list[int]] = []
     for group in data:
+        if not isinstance(group, list):
+            continue
         valid = [i for i in group if isinstance(i, int) and 0 <= i < n and i not in seen]
         seen.update(valid)
         if valid:
@@ -51,6 +72,7 @@ def deduplicate(articles: list[Article], status: RunStatus | None = None) -> lis
         {"index": i, "title": a.title, "source": a.source}
         for i, a in enumerate(articles)
     ]
+    text = ""
     try:
         text = complete(
             DEDUP_PROMPT,
@@ -60,7 +82,10 @@ def deduplicate(articles: list[Article], status: RunStatus | None = None) -> lis
         )
         groups = _parse_groups(text, len(articles))
     except Exception as e:
-        logger.error("Deduplication failed, falling back to no-dedup: %s", e)
+        logger.error(
+            "Deduplication failed, falling back to no-dedup: %s (response start: %r)",
+            e, text[:300],
+        )
         if status is not None:
             status.add("Deduplicação falhou; relatório pode conter notícias repetidas")
         return _no_dedup(articles)

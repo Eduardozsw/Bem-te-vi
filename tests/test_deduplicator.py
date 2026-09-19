@@ -73,3 +73,32 @@ def test_deduplicate_fills_missing_indices_as_singletons():
     assert len(result) == 2
     titles = {r.title for r in result}
     assert "C" in titles
+
+
+def test_deduplicate_ignores_text_after_the_json():
+    articles = [_make_article(t, f"S{t}", "x") for t in "ABC"]
+    response = '[[0, 2], [1]]\n\nGroups [0, 2] cover the same story.'
+    with patch("src.deduplicator.complete", return_value=response):
+        result = deduplicate(articles)
+
+    assert len(result) == 2
+
+
+def test_deduplicate_accepts_groups_without_outer_brackets():
+    articles = [_make_article(t, f"S{t}", "x") for t in "ABCD"]
+    status = RunStatus()
+    with patch("src.deduplicator.complete", return_value="[0, 3], [1], [2]"):
+        result = deduplicate(articles, status=status)
+
+    assert len(result) == 3
+    assert status.warnings == []
+    merged = next(r for r in result if r.title == "A")
+    assert merged.sources == ["SA", "SD"]
+
+
+def test_deduplicate_accepts_markdown_fenced_json():
+    articles = [_make_article(t, f"S{t}", "x") for t in "AB"]
+    with patch("src.deduplicator.complete", return_value="```json\n[[0, 1]]\n```"):
+        result = deduplicate(articles)
+
+    assert len(result) == 1
